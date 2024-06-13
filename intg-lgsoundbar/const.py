@@ -58,6 +58,9 @@ LG_REMOTE_BUTTONS_MAPPING: [DeviceButtonMapping] = [
     # {"button": Buttons.PLAY, "short_press": {"cmd_id": "PAUSE"}},
     # {"button": Buttons.PREV, "short_press": {"cmd_id": "REV"}},
     # {"button": Buttons.NEXT, "short_press": {"cmd_id": "CUE"}},
+    {"button": Buttons.VOLUME_UP, "short_press": {"cmd_id": "volume_up"}},
+    {"button": Buttons.VOLUME_DOWN, "short_press": {"cmd_id": "volume_down"}},
+    {"button": Buttons.MUTE, "short_press": {"cmd_id": "mute"}},
     {"button": Buttons.POWER, "short_press": {"cmd_id": "toggle"}},
 ]
 

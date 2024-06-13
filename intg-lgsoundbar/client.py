@@ -8,12 +8,11 @@ from asyncio import Lock
 import logging
 from enum import IntEnum
 
-
 import ucapi.media_player
 from aiohttp import ClientSession, ClientError
 from config import DeviceInstance
 from pyee import AsyncIOEventEmitter
-from ucapi.media_player import Attributes
+from ucapi.media_player import Attributes, Commands
 
 from const import States
 from lglib import temescal, functions, equalisers
@@ -288,6 +287,15 @@ class LGDevice(object):
         self._device.get_play()
         self._update_lock.release()
 
+    async def update_volume(self):
+        """Trigger updates from the device."""
+        if self._update_lock.locked():
+            return
+
+        await self._update_lock.acquire()
+        self._device.get_info()
+        self._update_lock.release()
+
     @property
     def id(self):
         return self._id
@@ -419,32 +427,38 @@ class LGDevice(object):
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         target_volume = volume * (self._volume_max - self._volume_min) / 100 + self._volume_min
-        await self._device.set_volume(int(target_volume))
+        self._device.set_volume(int(target_volume))
+        self._volume = target_volume
+        self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
+        await self.update_volume()
 
     @cmd_wrapper
     async def volume_up(self):
         """Send volume-up command to AVR."""
         volume = self._volume + self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = min(volume, self._volume_max)
-        await self._device.set_volume(int(volume))
+        self._device.set_volume(int(volume))
+        self._volume = volume
+        self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
+        await self.update_volume()
 
     @cmd_wrapper
     async def volume_down(self):
         """Send volume-down command to AVR."""
         volume = self._volume - self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = max(volume, self._volume_min)
-        await self._device.set_volume(int(volume))
+        self._device.set_volume(int(volume))
+        self._volume = volume
+        self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
+        await self.update_volume()
 
     @cmd_wrapper
     async def mute(self, muted: bool):
         """Send mute command to AVR."""
         _LOGGER.debug("Sending mute: %s", muted)
-        await self._device.set_mute(muted)
+        self._device.set_mute(muted)
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: muted})
-
-    @cmd_wrapper
-    async def send_command(self, command):
-        return ucapi.StatusCodes.NOT_IMPLEMENTED
+        await self.update_volume()
 
     @cmd_wrapper
     async def send_command(self, command):
@@ -460,3 +474,22 @@ class LGDevice(object):
             self._device.set_tv_remote(not self._tv_remote)
         elif command == "MODE_AUTO_DISPLAY":
             self._device.set_auto_display(not self._auto_display)
+        elif command == Commands.ON:
+            self._device.power(True)
+        elif command == Commands.OFF:
+            self._device.power(False)
+        elif command == Commands.TOGGLE:
+            if self.state == States.OFF:
+                self._device.power(False)
+            else:
+                self._device.power(True)
+        elif command == Commands.VOLUME_UP:
+            await self.volume_up()
+            return
+        elif command == Commands.VOLUME_DOWN:
+            await self.volume_down()
+            return
+        elif command == Commands.MUTE:
+            await self.mute()
+            return
+        await self.update()
