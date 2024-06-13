@@ -75,11 +75,14 @@ Available commands for remote entity :
 
 TODO
 
-| Command          | Description        |
-|------------------|--------------------|
-| POWERON          | Power on           |
-| POWEROFF         | Power off          |
-| POWER            | Power toggle       |
+| Command                        | Description               |
+|--------------------------------|---------------------------|
+| MODE_NIGHT                     | Night mode                |
+| MODE_AUTO_VOLUME_CONTROL       | Auto volume control       |
+| MODE_DYNAMIC_RANGE_COMPRESSION | Dynamic range compression |
+| MODE_NEURALX                   | Neural X                  |
+| MODE_TV_REMOTE                 | Control TV                |
+| MODE_AUTO_DISPLAY              | Auto display              |
 
 
 ## Build self-contained binary for Remote Two
