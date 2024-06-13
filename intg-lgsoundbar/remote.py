@@ -12,7 +12,7 @@ from config import create_entity_id, DeviceInstance
 from client import LGDevice
 from ucapi import EntityTypes, Remote, StatusCodes
 from ucapi.remote import Attributes, Commands, States as RemoteStates, Options, Features
-from const import LG_REMOTE_BUTTONS_MAPPING, LG_REMOTE_UI_PAGES, States, KEYS, LG_SIMPLE_COMMANDS
+from const import LG_REMOTE_BUTTONS_MAPPING, LG_REMOTE_UI_PAGES, States, LG_SIMPLE_COMMANDS
 
 _LOG = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class LGRemote(Remote):
     def __init__(self, config_device: DeviceInstance, device: LGDevice):
         """Initialize the class."""
         self._device = device
-        _LOG.debug("LGSoundbar init")
+        _LOG.debug("LGSoundbar remote init")
         entity_id = create_entity_id(config_device.id, EntityTypes.REMOTE)
         features = [Features.SEND_CMD, Features.ON_OFF, Features.TOGGLE]
         attributes = {
@@ -45,17 +45,17 @@ class LGRemote(Remote):
             features,
             attributes,
             button_mapping=LG_REMOTE_BUTTONS_MAPPING,
-            ui_pages=LG_REMOTE_UI_PAGES
+            ui_pages=LG_REMOTE_UI_PAGES,
+            simple_commands=LG_SIMPLE_COMMANDS
         )
 
-    def getIntParam(self, param: str, params: dict[str, Any], default:int):
+    def getIntParam(self, param: str, params: dict[str, Any], default: int):
         # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
         value = params.get(param, default)
         if isinstance(value, str) and len(value) > 0:
             return int(float(value))
         else:
             return default
-
 
     async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
         """
@@ -75,7 +75,7 @@ class LGRemote(Remote):
 
         repeat = self.getIntParam("repeat", params, 1)
         res = StatusCodes.OK
-        for i in range (0, repeat):
+        for i in range(0, repeat):
             res = await self.handle_command(cmd_id, params)
         return res
 
@@ -84,10 +84,8 @@ class LGRemote(Remote):
         delay = self.getIntParam("delay", params, 0)
         command = params.get("command", "")
 
-        if command in KEYS:
-            return await self._device.send_key(command)
-        elif command in self.options[Options.SIMPLE_COMMANDS]:
-            return await self._device.send_key(LG_SIMPLE_COMMANDS[command])
+        if command in self.options[Options.SIMPLE_COMMANDS]:
+            return await self._device.send_command(command)
         elif cmd_id == Commands.ON:
             return await self._device.turn_on()
         elif cmd_id == Commands.OFF:
@@ -95,9 +93,9 @@ class LGRemote(Remote):
         elif cmd_id == Commands.TOGGLE:
             return await self._device.toggle()
         elif cmd_id == Commands.SEND_CMD:
-            return await self._device.send_key(command)
+            return await self._device.send_command(command)
         elif cmd_id == Commands.SEND_CMD_SEQUENCE:
-            commands = params.get("sequence", [])#.split(",")
+            commands = params.get("sequence", [])  #.split(",")
             res = StatusCodes.OK
             for command in commands:
                 res = await self.handle_command(Commands.SEND_CMD, {"command": command, "params": params})
@@ -136,6 +134,3 @@ class LGRemote(Remote):
 
         _LOG.debug("LGRemote update attributes %s -> %s", update, attributes)
         return attributes
-
-
-

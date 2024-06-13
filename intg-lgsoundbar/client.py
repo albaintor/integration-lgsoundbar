@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 import asyncio
-import json
 from functools import wraps
 from typing import Callable, Concatenate, Awaitable, Any, Coroutine, TypeVar, ParamSpec
 
-import aiohttp
 from asyncio import Lock
 import logging
 from enum import IntEnum
@@ -15,9 +13,9 @@ import ucapi.media_player
 from aiohttp import ClientSession, ClientError
 from config import DeviceInstance
 from pyee import AsyncIOEventEmitter
-from ucapi.media_player import MediaType, Attributes
+from ucapi.media_player import Attributes
 
-from const import States, KEYS,MEDIA_PLAYER_STATE_MAPPING
+from const import States
 from lglib import temescal, functions, equalisers
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,9 +44,7 @@ def cmd_wrapper(
     async def wrapper(obj: _LGDeviceT, *args: _P.args, **kwargs: _P.kwargs) -> ucapi.StatusCodes:
         """Wrap all command methods."""
         try:
-            res = await func(obj, *args, **kwargs)
-            if res[0] == 'error':
-                return ucapi.StatusCodes.BAD_REQUEST
+            await func(obj, *args, **kwargs)
             return ucapi.StatusCodes.OK
         except ClientError as exc:
             # If Kodi is off, we expect calls to fail.
@@ -135,6 +131,12 @@ class LGDevice(object):
         self._media_duration = 0
         self._media_artwork = ""
         self._device_name = "LG"
+        self._night_mode = False
+        self._auto_volume_control = False
+        self._dynamic_range_reduction = False
+        self._neural_x = False
+        self._tv_remote = False
+        self._auto_display = False
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
@@ -201,6 +203,18 @@ class LGDevice(object):
                 self._equaliser = data["i_curr_eq"]
             if "s_user_name" in data:
                 self._device_name = data["s_user_name"]
+            if "b_night_mode" in data:
+                self._night_mode = data["b_night_mode"]
+            if "b_auto_vol" in data:
+                self._auto_volume_control = data["b_auto_vol"]
+            if "b_drc" in data:
+                self._dynamic_range_reduction = data["b_drc"]
+            if "b_neuralx" in data:
+                self._neural_x = data["b_neuralx"]
+            if "b_tv_remote" in data:
+                self._tv_remote = data["b_tv_remote"]
+            if "b_auto_display" in data:
+                self._auto_display = data["b_auto_display"]
             if current_sound_mode != self.sound_mode:
                 update_data[Attributes.SOUND_MODE] = self.sound_mode
             if len(current_sound_modes) != len(self.sound_mode_list):
@@ -431,3 +445,18 @@ class LGDevice(object):
     @cmd_wrapper
     async def send_command(self, command):
         return ucapi.StatusCodes.NOT_IMPLEMENTED
+
+    @cmd_wrapper
+    async def send_command(self, command):
+        if command == "MODE_NIGHT":
+            self._device.set_night_mode(not self._night_mode)
+        elif command == "MODE_AUTO_VOLUME_CONTROL":
+            self._device.set_avc(not self._auto_volume_control)
+        elif command == "MODE_DYNAMIC_RANGE_COMPRESSION":
+            self._device.set_drc(not self._dynamic_range_reduction)
+        elif command == "MODE_NEURALX":
+            self._device.set_neuralx(not self._neural_x)
+        elif command == "MODE_TV_REMOTE":
+            self._device.set_tv_remote(not self._tv_remote)
+        elif command == "MODE_AUTO_DISPLAY":
+            self._device.set_auto_display(not self._auto_display)

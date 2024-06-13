@@ -25,7 +25,7 @@ class LGMediaPlayer(MediaPlayer):
     def __init__(self, config_device: DeviceInstance, device: LGDevice):
         """Initialize the class."""
         self._device = device
-
+        _LOG.debug("LGSoundbar media player init")
         entity_id = create_entity_id(config_device.id, EntityTypes.MEDIA_PLAYER)
         #TODO add additional buttons if possible
         features = [
@@ -73,7 +73,7 @@ class LGMediaPlayer(MediaPlayer):
         }
 
         options = {
-            Options.SIMPLE_COMMANDS: list(LG_SIMPLE_COMMANDS.keys())
+            Options.SIMPLE_COMMANDS: LG_SIMPLE_COMMANDS
         }
         super().__init__(
             entity_id,
@@ -116,7 +116,7 @@ class LGMediaPlayer(MediaPlayer):
         elif cmd_id == Commands.SELECT_SOUND_MODE:
             res = await self._device.select_sound_mode(params.get("mode"))
         elif cmd_id in self.options[Options.SIMPLE_COMMANDS]:
-            return await self._device.send_command(LG_SIMPLE_COMMANDS[cmd_id])
+            return await self._device.send_command(cmd_id)
         else:
             return StatusCodes.NOT_IMPLEMENTED
 

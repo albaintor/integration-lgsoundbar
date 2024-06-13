@@ -89,6 +89,7 @@ class temescal:
         self.socket.connect((self.address, self.port))
 
     def listen(self):
+        data = None
         while True:
             try:
                 data = self.socket.recv(1)

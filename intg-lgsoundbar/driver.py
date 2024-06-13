@@ -330,8 +330,7 @@ def _register_available_entities(config_device: config.DeviceInstance, device: L
 
     :param config_device: device
     """
-    # plain and simple for now: only one media_player per AVR device
-    # entity = media_player.create_entity(device)
+    _LOG.debug("Register_available_entities for %s", config_device.name)
     entities = [media_player.LGMediaPlayer(config_device, device),
                 remote.LGRemote(config_device, device)]
     for entity in entities:
@@ -421,7 +420,7 @@ async def main():
     for device in _configured_devices.values():
         if not device.is_on:
             continue
-            _LOOP.create_task(device.update())
+        _LOOP.create_task(device.update())
 
     _LOOP.create_task(device_status_poller())
 

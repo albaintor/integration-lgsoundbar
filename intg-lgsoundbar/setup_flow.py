@@ -10,7 +10,6 @@ import logging
 from enum import IntEnum
 
 import config
-import discover
 from client import LGDevice
 from config import DeviceInstance
 from ucapi import (
@@ -266,7 +265,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
     dropdown_items = []
     address = msg.input_values["address"]
     port = msg.input_values["port"]
-    volume_step = 1
+    volume_step = 1.0
     try:
         volume_step = float(msg.input_values.get("volume_step", 1))
         if volume_step < 0.1 or volume_step > 10:
@@ -278,7 +277,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         _LOG.debug("Starting manual driver setup for %s", address)
         try:
             # simple connection check
-            device = LGDevice(device_config=DeviceInstance(id=address, address=address, port=port,
+            device = LGDevice(device_config=DeviceInstance(id=address, address=address, port=int(port),
                                                            volume_step=volume_step, name="LG"))
             await device.update()
             await asyncio.sleep(3)

@@ -43,8 +43,8 @@ class DeviceInstance:
     id: str
     name: str
     address: str
-    port: str
-    volume_step: int
+    port: int
+    volume_step: float
 
     def __init__(self, id, name, address, port, volume_step):
         self.id = id
