@@ -33,7 +33,12 @@ class LGMediaPlayer(MediaPlayer):
             Features.TOGGLE,
             Features.VOLUME,
             Features.VOLUME_UP_DOWN,
+            Features.MUTE,
+            Features.UNMUTE,
+            Features.MUTE_TOGGLE,
             Features.MEDIA_TYPE,
+            Features.SELECT_SOURCE,
+            Features.SELECT_SOUND_MODE,
             # Features.PLAY_PAUSE,
             # Features.DPAD,
             # Features.SETTINGS,
@@ -111,6 +116,12 @@ class LGMediaPlayer(MediaPlayer):
             return await self._device.volume_up()
         elif cmd_id == Commands.VOLUME_DOWN:
             return await self._device.volume_down()
+        elif cmd_id == Commands.MUTE_TOGGLE:
+            return await self._device.mute_toggle()
+        elif cmd_id == Commands.MUTE:
+            return await self._device.mute(True)
+        elif cmd_id == Commands.UNMUTE:
+            return await self._device.mute(False)
         elif cmd_id == Commands.SELECT_SOURCE:
             res = await self._device.select_source(params.get("source"))
         elif cmd_id == Commands.SELECT_SOUND_MODE:
@@ -119,6 +130,7 @@ class LGMediaPlayer(MediaPlayer):
             return await self._device.send_command(cmd_id)
         else:
             return StatusCodes.NOT_IMPLEMENTED
+        return res
 
     def filter_changed_attributes(self, update: dict[str, Any]) -> dict[str, Any]:
         """
@@ -149,6 +161,28 @@ class LGMediaPlayer(MediaPlayer):
         ]:
             if attr in update:
                 attributes = self._key_update_helper(attr, update[attr], attributes)
+
+        if Attributes.SOURCE_LIST in update:
+            if Attributes.SOURCE_LIST in self.attributes:
+                if update[Attributes.SOURCE_LIST] != self.attributes[Attributes.SOURCE_LIST]:
+                    attributes[Attributes.SOURCE_LIST] = update[Attributes.SOURCE_LIST]
+
+        if Features.SELECT_SOUND_MODE in self.features:
+            if Attributes.SOUND_MODE in update:
+                attributes = self._key_update_helper(Attributes.SOUND_MODE, update[Attributes.SOUND_MODE], attributes)
+            if Attributes.SOUND_MODE_LIST in update:
+                if Attributes.SOUND_MODE_LIST in self.attributes:
+                    if update[Attributes.SOUND_MODE_LIST] != self.attributes[Attributes.SOUND_MODE_LIST]:
+                        attributes[Attributes.SOUND_MODE_LIST] = update[Attributes.SOUND_MODE_LIST]
+
+        if Attributes.STATE in attributes:
+            if attributes[Attributes.STATE] == States.OFF:
+                attributes[Attributes.MEDIA_IMAGE_URL] = ""
+                attributes[Attributes.MEDIA_ALBUM] = ""
+                attributes[Attributes.MEDIA_ARTIST] = ""
+                attributes[Attributes.MEDIA_TITLE] = ""
+                attributes[Attributes.MEDIA_TYPE] = ""
+                attributes[Attributes.SOURCE] = ""
 
         _LOG.debug("MediaPlayer update attributes %s -> %s", update, attributes)
         return attributes

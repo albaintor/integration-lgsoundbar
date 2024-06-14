@@ -85,8 +85,22 @@ class temescal:
             self.thread.start()
 
     def connect(self):
+        if self.socket:
+            return
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((self.address, self.port))
+
+    def disconnect(self):
+        if self.socket:
+            try:
+                self.socket.close()
+            except Exception:
+                pass
+            self.socket = None
+
+    def reconnect(self):
+        self.disconnect()
+        self.connect()
 
     def listen(self):
         data = None

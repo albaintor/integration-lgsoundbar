@@ -51,6 +51,8 @@ class LGRemote(Remote):
 
     def getIntParam(self, param: str, params: dict[str, Any], default: int):
         # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
+        if params is None or param is None:
+            return default
         value = params.get(param, default)
         if isinstance(value, str) and len(value) > 0:
             return int(float(value))
@@ -82,15 +84,17 @@ class LGRemote(Remote):
     async def handle_command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
         hold = self.getIntParam("hold", params, 0)
         delay = self.getIntParam("delay", params, 0)
-        command = params.get("command", "")
+        command = ""
+        if params:
+            command = params.get("command", "")
 
         if command in self.options[Options.SIMPLE_COMMANDS]:
             return await self._device.send_command(command)
-        elif cmd_id == Commands.ON:
+        elif Commands.ON in [command, cmd_id]:
             return await self._device.turn_on()
-        elif cmd_id == Commands.OFF:
+        elif Commands.OFF in [command, cmd_id]:
             return await self._device.turn_off()
-        elif cmd_id == Commands.TOGGLE:
+        elif Commands.TOGGLE in [command, cmd_id]:
             return await self._device.toggle()
         elif cmd_id == Commands.SEND_CMD:
             return await self._device.send_command(command)

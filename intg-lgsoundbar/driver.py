@@ -43,11 +43,12 @@ async def device_status_poller(interval: float = 10.0) -> None:
         if _R2_IN_STANDBY:
             continue
         try:
+            # TODO : the device will send updates if the socket is active so no need to poll
+            # But the socket may be terminated by the LG device at some time
+            # Connection check is necessary : meantime we poll updates
             for device in _configured_devices.values():
-                # device.update_info()
-                # if not device.is_on:
-                #     continue
-                # TODO #20  run in parallel, join, adjust interval duration based on execution time for next update
+                if not device.is_on:
+                    continue
                 await device.update()
         except (KeyError, ValueError):
             pass
@@ -69,7 +70,6 @@ async def on_r2_connect_cmd() -> None:
 async def on_r2_disconnect_cmd():
     """Disconnect all configured receivers when the Remote Two sends the disconnect command."""
     for device in _configured_devices.values():
-        # start background task
         await device.disconnect()
 
 
@@ -408,6 +408,7 @@ async def main():
     logging.getLogger("discover").setLevel(level)
     logging.getLogger("driver").setLevel(level)
     logging.getLogger("media_player").setLevel(level)
+    logging.getLogger("remote").setLevel(level)
     logging.getLogger("receiver").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
 

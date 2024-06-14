@@ -182,7 +182,7 @@ class LGDevice(object):
             if current_source != self.source:
                 update_data[Attributes.SOURCE] = self.source
             if len(current_functions) != len(self.source_list):
-                update_data[Attributes.SOURCE] = self.source_list
+                update_data[Attributes.SOURCE_LIST] = self.source_list
         elif response["msg"] == "SETTING_VIEW_INFO":
             current_sound_mode = self.sound_mode
             current_sound_modes = self.sound_mode_list
@@ -265,12 +265,15 @@ class LGDevice(object):
         # self._session = aiohttp.ClientSession(timeout=session_timeout,
         #                                       raise_for_status=True)
         # self._device.connect()
+        self._device.connect()
+        await self.update()
         self.events.emit(Events.CONNECTED, self.id)
 
     async def disconnect(self):
-        if self._session:
-            await self._session.close()
-            self._session = None
+        # if self._session:
+        #     await self._session.close()
+        #     self._session = None
+        self._device.disconnect()
 
     async def update(self):
         """Trigger updates from the device."""
@@ -397,9 +400,9 @@ class LGDevice(object):
     @cmd_wrapper
     async def toggle(self):
         if self.state == States.OFF:
-            self._device.power(False)
-        else:
             self._device.power(True)
+        else:
+            self._device.power(False)
 
     @cmd_wrapper
     async def turn_on(self):
@@ -430,7 +433,7 @@ class LGDevice(object):
         self._device.set_volume(int(target_volume))
         self._volume = target_volume
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
-        await self.update_volume()
+        # await self.update_volume()
 
     @cmd_wrapper
     async def volume_up(self):
@@ -440,7 +443,7 @@ class LGDevice(object):
         self._device.set_volume(int(volume))
         self._volume = volume
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
-        await self.update_volume()
+        # await self.update_volume()
 
     @cmd_wrapper
     async def volume_down(self):
@@ -450,7 +453,7 @@ class LGDevice(object):
         self._device.set_volume(int(volume))
         self._volume = volume
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
-        await self.update_volume()
+        # await self.update_volume()
 
     @cmd_wrapper
     async def mute(self, muted: bool):
@@ -458,7 +461,16 @@ class LGDevice(object):
         _LOGGER.debug("Sending mute: %s", muted)
         self._device.set_mute(muted)
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: muted})
-        await self.update_volume()
+        # await self.update_volume()
+
+    @cmd_wrapper
+    async def mute_toggle(self):
+        """Send mute command to AVR."""
+        mute = not self.muted
+        _LOGGER.debug("Sending mute: %s", mute)
+        self._device.set_mute(mute)
+        self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: mute})
+        # await self.update_volume()
 
     @cmd_wrapper
     async def send_command(self, command):
@@ -492,4 +504,5 @@ class LGDevice(object):
         elif command == Commands.MUTE:
             await self.mute()
             return
-        await self.update()
+        # Not needed
+        # await self.update()
