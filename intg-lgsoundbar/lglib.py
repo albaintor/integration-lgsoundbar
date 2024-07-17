@@ -1,28 +1,38 @@
-# Copyright 2018 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""
+LG soundbar library handling of the integration driver.
+
+:copyright: (c) 2023 by Unfolded Circle ApS.
+:license: Mozilla Public License Version 2.0, see LICENSE for more details.
+"""
 
 import json
 import socket
 import struct
-
-from Crypto.Cipher import AES
 from threading import Thread
 
-equalisers = ["Standard", "Bass", "Flat", "Boost", "Treble and Bass", "User",
-              "Music", "Cinema", "Night", "News", "Voice", "ia_sound",
-              "Adaptive Sound Control", "Movie", "Bass Blast", "Dolby Atmos",
-              "DTS Virtual X", "Bass Boost Plus", "DTS X"]
+from Crypto.Cipher import AES
+
+equalisers = [
+    "Standard",
+    "Bass",
+    "Flat",
+    "Boost",
+    "Treble and Bass",
+    "User",
+    "Music",
+    "Cinema",
+    "Night",
+    "News",
+    "Voice",
+    "ia_sound",
+    "Adaptive Sound Control",
+    "Movie",
+    "Bass Blast",
+    "Dolby Atmos",
+    "DTS Virtual X",
+    "Bass Boost Plus",
+    "DTS X",
+]
 
 STANDARD = 0
 BASS = 1
@@ -44,9 +54,28 @@ DTS_VIRTUAL_X = 16
 BASS_BOOST_PLUS = 17
 DTS_X = 18
 
-functions = ["Wifi", "Bluetooth", "Portable", "Aux", "Optical", "CP", "HDMI",
-             "ARC", "Spotify", "Optical2", "HDMI2", "HDMI3", "LG TV", "Mic",
-             "Chromecast", "Optical/HDMI ARC", "LG Optical", "FM", "USB", "USB2"]
+functions = [
+    "Wifi",
+    "Bluetooth",
+    "Portable",
+    "Aux",
+    "Optical",
+    "CP",
+    "HDMI",
+    "ARC",
+    "Spotify",
+    "Optical2",
+    "HDMI2",
+    "HDMI3",
+    "LG TV",
+    "Mic",
+    "Chromecast",
+    "Optical/HDMI ARC",
+    "LG Optical",
+    "FM",
+    "USB",
+    "USB2",
+]
 
 WIFI = 0
 BLUETOOTH = 1
@@ -70,10 +99,13 @@ USB = 18
 USB_2 = 19
 
 
-class temescal:
+class Temescal:
+    """LG library."""
+
     def __init__(self, address, port=9741, callback=None, logger=None):
-        self.iv = b'\'%^Ur7gy$~t+f)%@'
-        self.key = b'T^&*J%^7tr~4^%^&I(o%^!jIJ__+a0 k'
+        """Initialize a LG soundbar device."""
+        self.iv = b"'%^Ur7gy$~t+f)%@"
+        self.key = b"T^&*J%^7tr~4^%^&I(o%^!jIJ__+a0 k"
         self.address = address
         self.port = port
         self.callback = callback
@@ -85,28 +117,34 @@ class temescal:
             self.thread.start()
 
     def connect(self):
+        """Connect to the device."""
         if self.socket:
             return
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((self.address, self.port))
 
     def disconnect(self):
+        """Disconnect from the device."""
         if self.socket:
             try:
                 self.socket.close()
+            # pylint: disable=W0718
             except Exception:
                 pass
             self.socket = None
 
     def reconnect(self):
+        """Reconnect."""
         self.disconnect()
         self.connect()
 
     def listen(self):
+        """Listen for device responses."""
         data = None
         while True:
             try:
                 data = self.socket.recv(1)
+            # pylint: disable=W0718
             except Exception:
                 self.connect()
 
@@ -127,10 +165,11 @@ class temescal:
                     self.callback(json.loads(response))
 
     def encrypt_packet(self, data):
+        """Encrypt packet to send to the device."""
         padlen = 16 - (len(data) % 16)
-        for i in range(padlen):
+        for _i in range(padlen):
             data = data + chr(padlen)
-        data = data.encode('utf-8')
+        data = data.encode("utf-8")
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
 
         encrypted = cipher.encrypt(data)
@@ -139,13 +178,16 @@ class temescal:
         return prelude + encrypted
 
     def decrypt_packet(self, data):
+        """Decrypt received packet."""
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         decrypt = cipher.decrypt(data)
         padding = decrypt[-1:]
-        decrypt = decrypt[:-ord(padding)]
-        return str(decrypt, 'utf-8')
+        decrypt = decrypt[: -ord(padding)]
+        return str(decrypt, "utf-8")
 
     def send_packet(self, data):
+        """Send a packet."""
+        # pylint: disable=W0718
         packet = self.encrypt_packet(json.dumps(data))
         try:
             self.socket.send(packet)
@@ -157,158 +199,197 @@ class temescal:
                 pass
 
     def power(self, value: bool):
+        """Power command."""
         data = {"cmd": "set", "data": {"b_powerkey": value}, "msg": "SPK_LIST_VIEW_INFO"}
         self.send_packet(data)
 
     def get_eq(self):
+        """Get equalizer settings."""
         data = {"cmd": "get", "msg": "EQ_VIEW_INFO"}
         self.send_packet(data)
 
     def set_eq(self, eq):
+        """Set equalizer settings."""
         data = {"cmd": "set", "data": {"i_curr_eq": eq}, "msg": "EQ_VIEW_INFO"}
         self.send_packet(data)
 
     def get_info(self):
+        """Get information."""
         data = {"cmd": "get", "msg": "SPK_LIST_VIEW_INFO"}
         self.send_packet(data)
 
     def get_play(self):
+        """Get play state."""
         data = {"cmd": "get", "msg": "PLAY_INFO"}
         self.send_packet(data)
 
     def get_func(self):
+        """Get functions information."""
         data = {"cmd": "get", "msg": "FUNC_VIEW_INFO"}
         self.send_packet(data)
 
     def get_settings(self):
+        """Get settings information."""
         data = {"cmd": "get", "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def get_product_info(self):
+        """Get product information."""
         data = {"cmd": "get", "msg": "PRODUCT_INFO"}
         self.send_packet(data)
 
     def get_c4a_info(self):
+        """Get C4A_SETTING_INFO."""
         data = {"cmd": "get", "msg": "C4A_SETTING_INFO"}
         self.send_packet(data)
 
     def get_radio_info(self):
+        """Get radio information."""
         data = {"cmd": "get", "msg": "RADIO_VIEW_INFO"}
         self.send_packet(data)
 
     def get_ap_info(self):
+        """Get app information."""
         data = {"cmd": "get", "msg": "SHARE_AP_INFO"}
         self.send_packet(data)
 
     def get_update_info(self):
+        """Get update information."""
         data = {"cmd": "get", "msg": "UPDATE_VIEW_INFO"}
         self.send_packet(data)
 
     def get_build_info(self):
+        """Get build information."""
         data = {"cmd": "get", "msg": "BUILD_INFO_DEV"}
         self.send_packet(data)
 
     def get_option_info(self):
+        """Get options information."""
         data = {"cmd": "get", "msg": "OPTION_INFO_DEV"}
         self.send_packet(data)
 
     def get_mac_info(self):
+        """Get mac information."""
         data = {"cmd": "get", "msg": "MAC_INFO_DEV"}
         self.send_packet(data)
 
     def get_mem_mon_info(self):
+        """Get memory monitoring information."""
         data = {"cmd": "get", "msg": "MEM_MON_DEV"}
         self.send_packet(data)
 
     def get_test_info(self):
+        """Get test information."""
         data = {"cmd": "get", "msg": "TEST_DEV"}
         self.send_packet(data)
 
     def test_tone(self):
+        """Get test tone."""
         data = {"cmd": "set", "msg": "TEST_TONE_REQ"}
         self.send_packet(data)
 
     def set_night_mode(self, enable):
+        """Set night mode."""
         data = {"cmd": "set", "data": {"b_night_mode": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_avc(self, enable):
+        """Set AVC mode."""
         data = {"cmd": "set", "data": {"b_auto_vol": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_drc(self, enable):
+        """Set dynamic range compression."""
         data = {"cmd": "set", "data": {"b_drc": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_neuralx(self, enable):
+        """Set Neural X."""
         data = {"cmd": "set", "data": {"b_neuralx": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_av_sync(self, value):
+        """Set AV sync."""
         data = {"cmd": "set", "data": {"i_av_sync": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_woofer_level(self, value):
+        """Set subwoofer level."""
         data = {"cmd": "set", "data": {"i_woofer_level": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_rear_control(self, enable):
+        """Set rear control."""
         data = {"cmd": "set", "data": {"b_rear": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_rear_level(self, value):
+        """Set rear level."""
         data = {"cmd": "set", "data": {"i_rear_level": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_top_level(self, value):
+        """Set top level."""
         data = {"cmd": "set", "data": {"i_top_level": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_center_level(self, value):
+        """Set center level."""
         data = {"cmd": "set", "data": {"i_center_level": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_tv_remote(self, enable):
+        """Enable TV remote."""
         data = {"cmd": "set", "data": {"b_tv_remote": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_auto_power(self, enable):
+        """Set auto power."""
         data = {"cmd": "set", "data": {"b_auto_power": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_auto_display(self, enable):
+        """Set auto display."""
         data = {"cmd": "set", "data": {"b_auto_display": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_bt_standby(self, enable):
+        """Set Bluetooth standby."""
         data = {"cmd": "set", "data": {"b_bt_standby": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_bt_restrict(self, enable):
+        """Set Bluetooth restriction."""
         data = {"cmd": "set", "data": {"b_conn_bt_limit": enable}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_sleep_time(self, value):
+        """Set sleep time."""
         data = {"cmd": "set", "data": {"i_sleep_time": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def set_func(self, value):
+        """Set source."""
         data = {"cmd": "set", "data": {"i_curr_func": value}, "msg": "FUNC_VIEW_INFO"}
         self.send_packet(data)
 
     def set_volume(self, value):
+        """Set volume."""
         data = {"cmd": "set", "data": {"i_vol": value}, "msg": "SPK_LIST_VIEW_INFO"}
         self.send_packet(data)
 
     def set_mute(self, enable):
+        """Set mute."""
         data = {"cmd": "set", "data": {"b_mute": enable}, "msg": "SPK_LIST_VIEW_INFO"}
         self.send_packet(data)
 
     def set_name(self, name):
+        """Set device name."""
         data = {"cmd": "set", "data": {"s_user_name": name}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
     def send_command(self, msg, data):
+        """Send a command."""
         if data:
             payload = {"cmd": "set", "data": data, "msg": msg}
         else:
@@ -316,5 +397,6 @@ class temescal:
         self.send_packet(payload)
 
     def set_factory(self):
+        """Set to factory."""
         data = {"cmd": "set", "msg": "FACTORY_SET_REQ"}
         self.send_packet(data)

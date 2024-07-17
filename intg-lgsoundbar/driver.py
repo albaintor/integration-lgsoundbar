@@ -12,19 +12,19 @@ import logging
 import os
 from typing import Any
 
-import ucapi
-import ucapi.api_definitions as uc
-import websockets
-from ucapi.api import filter_log_msg_data, IntegrationAPI
-from ucapi.media_player import Attributes as MediaAttr, MediaType
-
 import client
 import config
 import media_player
 import remote
 import setup_flow
+import ucapi
+import ucapi.api_definitions as uc
+import websockets
 from client import LGDevice
 from config import device_from_entity_id
+from ucapi.api import IntegrationAPI, filter_log_msg_data
+from ucapi.media_player import Attributes as MediaAttr
+from ucapi.media_player import MediaType
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 _LOOP = asyncio.get_event_loop()
@@ -36,24 +36,6 @@ _configured_devices: dict[str, LGDevice] = {}
 _R2_IN_STANDBY = False
 
 
-async def device_status_poller(interval: float = 10.0) -> None:
-    """Receiver data poller."""
-    while True:
-        await asyncio.sleep(interval)
-        if _R2_IN_STANDBY:
-            continue
-        try:
-            # TODO : the device will send updates if the socket is active so no need to poll
-            # But the socket may be terminated by the LG device at some time
-            # Connection check is necessary : meantime we poll updates
-            for device in _configured_devices.values():
-                if not device.is_on:
-                    continue
-                await device.update()
-        except (KeyError, ValueError):
-            pass
-
-
 @api.listens_to(ucapi.Events.CONNECT)
 async def on_r2_connect_cmd() -> None:
     """Connect all configured receivers when the Remote Two sends the connect command."""
@@ -63,7 +45,6 @@ async def on_r2_connect_cmd() -> None:
     for device in _configured_devices.values():
         # start background task
         await device.connect()
-        await _LOOP.create_task(device.update())
 
 
 @api.listens_to(ucapi.Events.DISCONNECT)
@@ -75,8 +56,8 @@ async def on_r2_disconnect_cmd():
 
 @api.listens_to(ucapi.Events.ENTER_STANDBY)
 async def on_r2_enter_standby() -> None:
-    """
-    Enter standby notification from Remote Two.
+    """Enter standby notification from Remote Two.
+
     Disconnect every OrangeTV instances.
     """
     global _R2_IN_STANDBY
@@ -102,7 +83,6 @@ async def on_r2_exit_standby() -> None:
     for device in _configured_devices.values():
         # start background task
         await device.connect()
-        await _LOOP.create_task(device.update())
 
 
 @api.listens_to(ucapi.Events.SUBSCRIBE_ENTITIES)
@@ -122,11 +102,13 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
         if device_id in _configured_devices:
             device = _configured_devices[device_id]
             if isinstance(entity, media_player.LGMediaPlayer):
-                api.configured_entities.update_attributes(entity_id,
-          {ucapi.media_player.Attributes.STATE: media_player.state_from_device(device.state)})
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.media_player.Attributes.STATE: media_player.state_from_device(device.state)}
+                )
             if isinstance(entity, remote.LGRemote):
-                api.configured_entities.update_attributes(entity_id,
-          {ucapi.remote.Attributes.STATE: remote.LG_REMOTE_STATE_MAPPING.get(device.state)})
+                api.configured_entities.update_attributes(
+                    entity_id, {ucapi.remote.Attributes.STATE: remote.LG_REMOTE_STATE_MAPPING.get(device.state)}
+                )
             continue
 
         device = config.devices.get(device_id)
@@ -149,7 +131,7 @@ async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
 
     # Keep devices that are used by other configured entities not in this list
     for entity in api.configured_entities.get_all():
-        entity_id = entity.get('entity_id')
+        entity_id = entity.get("entity_id")
         if entity_id in entity_ids:
             continue
         device_id = device_from_entity_id(entity_id)
@@ -181,14 +163,15 @@ async def on_device_connected(device_id: str):
             continue
 
         if configured_entity.entity_type == ucapi.EntityTypes.MEDIA_PLAYER:
-            if (configured_entity.attributes[ucapi.media_player.Attributes.STATE]
-                    == ucapi.media_player.States.UNAVAILABLE):
+            if (
+                configured_entity.attributes[ucapi.media_player.Attributes.STATE]
+                == ucapi.media_player.States.UNAVAILABLE
+            ):
                 api.configured_entities.update_attributes(
                     entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.STANDBY}
                 )
         elif configured_entity.entity_type == ucapi.EntityTypes.REMOTE:
-            if (configured_entity.attributes[ucapi.remote.Attributes.STATE]
-                    == ucapi.remote.States.UNAVAILABLE):
+            if configured_entity.attributes[ucapi.remote.Attributes.STATE] == ucapi.remote.States.UNAVAILABLE:
                 api.configured_entities.update_attributes(
                     entity_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.OFF}
                 )
@@ -331,8 +314,7 @@ def _register_available_entities(config_device: config.DeviceInstance, device: L
     :param config_device: device
     """
     _LOG.debug("Register_available_entities for %s", config_device.name)
-    entities = [media_player.LGMediaPlayer(config_device, device),
-                remote.LGRemote(config_device, device)]
+    entities = [media_player.LGMediaPlayer(config_device, device), remote.LGRemote(config_device, device)]
     for entity in entities:
         if api.available_entities.contains(entity.id):
             api.available_entities.remove(entity.id)
@@ -370,9 +352,7 @@ async def _async_remove(device: LGDevice) -> None:
     device.events.remove_all_listeners()
 
 
-async def patched_broadcast_ws_event(
-        self, msg: str, msg_data: dict[str, Any], category: uc.EventCategory
-) -> None:
+async def patched_broadcast_ws_event(self, msg: str, msg_data: dict[str, Any], category: uc.EventCategory) -> None:
     """
     Send the given event-message to all connected WebSocket clients.
 
@@ -389,7 +369,7 @@ async def patched_broadcast_ws_event(
     # filter fields
     if _LOG.isEnabledFor(logging.DEBUG):
         data_log = json.dumps(data) if filter_log_msg_data(data) else data_dump
-
+    # pylint: disable=W0212
     for websocket in self._clients.copy():
         if _LOG.isEnabledFor(logging.DEBUG):
             _LOG.debug("[%s] ->: %s", websocket.remote_address, data_log)
@@ -397,6 +377,7 @@ async def patched_broadcast_ws_event(
             await websocket.send(data_dump)
         except websockets.exceptions.WebSocketException:
             pass
+
 
 async def main():
     """Start the Remote Two integration driver."""
@@ -423,8 +404,7 @@ async def main():
             continue
         _LOOP.create_task(device.update())
 
-    _LOOP.create_task(device_status_poller())
-
+    # pylint: disable=W0212
     IntegrationAPI._broadcast_ws_event = patched_broadcast_ws_event
     await api.init("driver.json", setup_flow.driver_setup_handler)
 

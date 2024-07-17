@@ -1,23 +1,31 @@
-#!/usr/bin/env python
+"""
+This module implements the LG soundbar communication of the Remote Two integration driver.
+
+:copyright: (c) 2024 by Unfolded Circle ApS.
+:license: Mozilla Public License Version 2.0, see LICENSE for more details.
+"""
+
 # coding: utf-8
 import asyncio
-from functools import wraps
-from typing import Callable, Concatenate, Awaitable, Any, Coroutine, TypeVar, ParamSpec
-
-from asyncio import Lock
 import logging
+from asyncio import CancelledError, Lock
+from datetime import timedelta
 from enum import IntEnum
+from functools import wraps
+from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
 import ucapi.media_player
-from aiohttp import ClientSession, ClientError
+from aiohttp import ClientError, ClientSession
 from config import DeviceInstance
+from const import States
 from pyee import AsyncIOEventEmitter
 from ucapi.media_player import Attributes, Commands
 
-from const import States
-from lglib import temescal, functions, equalisers
+from lglib import Temescal, equalisers, functions
 
 _LOGGER = logging.getLogger(__name__)
+
+CONNECTION_RETRIES = 10
 
 
 class Events(IntEnum):
@@ -35,15 +43,17 @@ _P = ParamSpec("_P")
 
 
 def cmd_wrapper(
-        func: Callable[Concatenate[_LGDeviceT, _P], Awaitable[ucapi.StatusCodes | list]],
+    func: Callable[Concatenate[_LGDeviceT, _P], Awaitable[ucapi.StatusCodes | list]],
 ) -> Callable[Concatenate[_LGDeviceT, _P], Coroutine[Any, Any, ucapi.StatusCodes | list]]:
     """Catch command exceptions."""
 
     @wraps(func)
     async def wrapper(obj: _LGDeviceT, *args: _P.args, **kwargs: _P.kwargs) -> ucapi.StatusCodes:
         """Wrap all command methods."""
+        # pylint: disable = W0212
         try:
             await func(obj, *args, **kwargs)
+            await obj.start_polling()
             return ucapi.StatusCodes.OK
         except ClientError as exc:
             # If Kodi is off, we expect calls to fail.
@@ -66,38 +76,37 @@ def cmd_wrapper(
                 async with asyncio.timeout(5):
                     await connect_task
             except asyncio.TimeoutError:
-                log_function(
-                    "Timeout for reconnect, command won't be sent"
-                )
-                pass
+                log_function("Timeout for reconnect, command won't be sent")
             else:
                 if not obj._connect_error:
                     try:
                         await func(obj, *args, **kwargs)
                         return ucapi.StatusCodes.OK
-                    except ClientError as exc:
+                    except ClientError as ex:
                         log_function(
                             "Error calling %s on entity %s: %r trying to reconnect",
                             func.__name__,
                             obj.id,
-                            exc,
+                            ex,
                         )
             return ucapi.StatusCodes.BAD_REQUEST
+        # pylint: disable = W0718
         except Exception as ex:
-            _LOGGER.error(
-                "Unknown error %s",
-                func.__name__)
+            _LOGGER.error("Unknown error %s %s", func.__name__, ex)
 
     return wrapper
 
 
-class LGDevice(object):
+class LGDevice:
+    """LG client library."""
+
     def __init__(self, device_config: DeviceInstance, timeout=3, refresh_frequency=60):
-        from datetime import timedelta
+        """Initialize of a LG soundbar instance."""
         self._id = device_config.id
         self._name = device_config.name
         self._hostname = device_config.address
         self._port = device_config.port
+        self._device_config = device_config
         self._timeout = timeout
         self.refresh_frequency = timedelta(seconds=refresh_frequency)
         self._state = States.UNKNOWN
@@ -105,7 +114,7 @@ class LGDevice(object):
         self.events = AsyncIOEventEmitter(self._event_loop)
         self._update_lock = Lock()
         self._session: ClientSession | None = None
-        self._device = temescal(self._hostname, self._port, self.handle_event, _LOGGER)
+        self._device = Temescal(self._hostname, self._port, self.handle_event, _LOGGER)
         self._volume_step = device_config.volume_step
         self._volume = 0
         self._volume_min = 0
@@ -136,9 +145,12 @@ class LGDevice(object):
         self._neural_x = False
         self._tv_remote = False
         self._auto_display = False
+        self._reconnect_retry = 0
+        self._update_task = None
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
+        # pylint: disable = R0914,R0915
         data = response.get("data") or {}
         update_data = {}
         if response["msg"] == "EQ_VIEW_INFO":
@@ -251,13 +263,10 @@ class LGDevice(object):
                 update_data[Attributes.MEDIA_IMAGE_URL] = self.media_image_url
 
         if update_data:
-            self.events.emit(
-                Events.UPDATE,
-                self.id,
-                update_data
-            )
+            self.events.emit(Events.UPDATE, self.id, update_data)
 
     async def connect(self):
+        """Connect to a LG soundbar."""
         # if self._session:
         #     await self._session.close()
         #     self._session = None
@@ -267,9 +276,49 @@ class LGDevice(object):
         # self._device.connect()
         self._device.connect()
         await self.update()
+        await self.start_polling()
         self.events.emit(Events.CONNECTED, self.id)
 
+    async def start_polling(self):
+        """Start polling task."""
+        if self._update_task is not None:
+            return
+        await self._update_lock.acquire()
+        if self._update_task is not None:
+            return
+        _LOGGER.debug("Start polling task for device %s", self.id)
+        self._update_task = self._event_loop.create_task(self._background_update_task())
+        self._update_lock.release()
+
+    async def stop_polling(self):
+        """Stop polling task."""
+        if self._update_task:
+            try:
+                self._update_task.cancel()
+            except CancelledError:
+                pass
+            self._update_task = None
+
+    async def _background_update_task(self):
+        self._reconnect_retry = 0
+        while True:
+            if not self._device_config.always_on:
+                if self.state == States.OFF:
+                    self._reconnect_retry += 1
+                    if self._reconnect_retry > CONNECTION_RETRIES:
+                        _LOGGER.debug("Stopping update task as the device %s is off", self.id)
+                        break
+                    _LOGGER.debug("Device %s is off, retry %s", self.id, self._reconnect_retry)
+                elif self._reconnect_retry > 0:
+                    self._reconnect_retry = 0
+                    _LOGGER.debug("Device %s is on again", self.id)
+            await self.update()
+            await asyncio.sleep(10)
+
+        self._update_task = None
+
     async def disconnect(self):
+        """Connect from a LG soundbar."""
         # if self._session:
         #     await self._session.close()
         #     self._session = None
@@ -301,22 +350,27 @@ class LGDevice(object):
 
     @property
     def id(self):
+        """Identifier of the device."""
         return self._id
 
     @property
     def hostname(self):
+        """Hostname."""
         return self._hostname
 
     @property
     def port(self):
+        """Connection port."""
         return self._port
 
     @property
     def volume_step(self):
+        """Volume step set."""
         return self._volume_step
 
     @property
     def state(self) -> States:
+        """State of the device."""
         if not self._power_state:
             self._state = States.OFF
         else:
@@ -325,20 +379,24 @@ class LGDevice(object):
 
     @property
     def name(self):
+        """Name."""
         return self._name
 
     @property
     def device_name(self):
+        """Device name."""
         return self._device_name
 
     @property
     def volume(self):
+        """Current volume."""
         if self._volume_max - self._volume_min == 0:
             return 0
         return 100 * abs((self._volume - self._volume_min) / (self._volume_max - self._volume_min))
 
     @property
     def muted(self):
+        """Muted."""
         return self._mute
 
     @property
@@ -351,14 +409,11 @@ class LGDevice(object):
     @property
     def source_list(self):
         """List of available input sources."""
-        return sorted(
-            functions[function]
-            for function in self._functions
-            if function < len(functions)
-        )
+        return sorted(functions[function] for function in self._functions if function < len(functions))
 
     @property
     def is_on(self):
+        """Return true if on."""
         return self.state in [States.PAUSED, States.STOPPED, States.PLAYING, States.ON]
 
     @property
@@ -371,34 +426,36 @@ class LGDevice(object):
     @property
     def sound_mode_list(self):
         """Return the available sound modes."""
-        return sorted(
-            equalisers[equaliser]
-            for equaliser in self._equalisers
-            if equaliser < len(equalisers)
-        )
+        return sorted(equalisers[equaliser] for equaliser in self._equalisers if equaliser < len(equalisers))
 
     @property
     def media_artist(self):
+        """Current artist."""
         return self._media_artist
 
     @property
     def media_title(self):
+        """Current title."""
         return self._media_title
 
     @property
     def media_image_url(self):
+        """Current media image."""
         return self._media_artwork
 
     @property
     def media_position(self):
+        """Current media position."""
         return self._media_position
 
     @property
     def media_duration(self):
+        """Current media duration."""
         return self._media_duration
 
     @cmd_wrapper
     async def toggle(self):
+        """Toggle on or off."""
         if self.state == States.OFF:
             self._device.power(True)
         else:
@@ -406,10 +463,12 @@ class LGDevice(object):
 
     @cmd_wrapper
     async def turn_on(self):
+        """Turn on."""
         self._device.power(True)
 
     @cmd_wrapper
     async def turn_off(self):
+        """Turn off."""
         self._device.power(False)
 
     @cmd_wrapper
@@ -474,6 +533,7 @@ class LGDevice(object):
 
     @cmd_wrapper
     async def send_command(self, command):
+        """Send a command to the device."""
         if command == "MODE_NIGHT":
             self._device.set_night_mode(not self._night_mode)
         elif command == "MODE_AUTO_VOLUME_CONTROL":
@@ -497,12 +557,9 @@ class LGDevice(object):
                 self._device.power(True)
         elif command == Commands.VOLUME_UP:
             await self.volume_up()
-            return
         elif command == Commands.VOLUME_DOWN:
             await self.volume_down()
-            return
         elif command == Commands.MUTE:
-            await self.mute()
-            return
+            await self.mute_toggle()
         # Not needed
         # await self.update()

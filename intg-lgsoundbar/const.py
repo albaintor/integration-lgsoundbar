@@ -1,12 +1,19 @@
+#!/usr/bin/env python3
+"""
+This module implements a Remote Two integration driver for Orange STB.
+
+:copyright: (c) 2023 by Unfolded Circle ApS.
+:license: Mozilla Public License Version 2.0, see LICENSE for more details.
+"""
+
 from datetime import timedelta
 
 __version__ = "1.0.0"
 
-from enum import IntEnum, Enum
+from enum import IntEnum
 
 import ucapi
-from ucapi.media_player import Commands
-from ucapi.ui import DeviceButtonMapping, Buttons, UiPage
+from ucapi.ui import Buttons, DeviceButtonMapping, UiPage
 
 
 class States(IntEnum):
@@ -41,7 +48,7 @@ LG_SIMPLE_COMMANDS = [
     "MODE_DYNAMIC_RANGE_COMPRESSION",
     "MODE_NEURALX",
     "MODE_TV_REMOTE",
-    "MODE_AUTO_DISPLAY"
+    "MODE_AUTO_DISPLAY",
 ]
 
 
@@ -71,101 +78,50 @@ LG_REMOTE_UI_PAGES: [UiPage] = [
         "grid": {"width": 4, "height": 6},
         "items": [
             {
-                "command": {
-                    "cmd_id": "remote.send",
-                    "params": {"command": "toggle", "repeat": 1}
-                },
+                "command": {"cmd_id": "remote.send", "params": {"command": "toggle", "repeat": 1}},
                 "icon": "uc:power-on",
-                "location": {
-                    "x": 0,
-                    "y": 0
-                },
-                "size": {
-                    "height": 1,
-                    "width": 1
-                },
-                "type": "icon"
+                "location": {"x": 0, "y": 0},
+                "size": {"height": 1, "width": 1},
+                "type": "icon",
             },
             {
-                "command": {
-                    "cmd_id": "remote.send",
-                    "params": {"command": "MODE_AUTO_VOLUME_CONTROL", "repeat": 1}
-                },
+                "command": {"cmd_id": "remote.send", "params": {"command": "MODE_AUTO_VOLUME_CONTROL", "repeat": 1}},
                 "icon": "uc:language",
-                "location": {
-                    "x": 1,
-                    "y": 0
-                },
-                "size": {
-                    "height": 1,
-                    "width": 1
-                },
-                "type": "icon"
+                "location": {"x": 1, "y": 0},
+                "size": {"height": 1, "width": 1},
+                "type": "icon",
             },
             {
-                "command": {
-                    "cmd_id": "remote.send",
-                    "params": {"command": "MODE_NIGHT", "repeat": 1}
-                },
+                "command": {"cmd_id": "remote.send", "params": {"command": "MODE_NIGHT", "repeat": 1}},
                 "text": "Night mode",
-                "location": {
-                    "x": 2,
-                    "y": 0
-                },
-                "size": {
-                    "height": 1,
-                    "width": 1
-                },
-                "type": "text"
+                "location": {"x": 2, "y": 0},
+                "size": {"height": 1, "width": 1},
+                "type": "text",
             },
             {
                 "command": {
                     "cmd_id": "remote.send",
-                    "params": {"command": "MODE_DYNAMIC_RANGE_COMPRESSION", "repeat": 1}
+                    "params": {"command": "MODE_DYNAMIC_RANGE_COMPRESSION", "repeat": 1},
                 },
                 "text": "DRC",
-                "location": {
-                    "x": 3,
-                    "y": 0
-                },
-                "size": {
-                    "height": 1,
-                    "width": 1
-                },
-                "type": "text"
+                "location": {"x": 3, "y": 0},
+                "size": {"height": 1, "width": 1},
+                "type": "text",
             },
             {
-                "command": {
-                    "cmd_id": "remote.send",
-                    "params": {"command": "MODE_NEURALX", "repeat": 1}
-                },
+                "command": {"cmd_id": "remote.send", "params": {"command": "MODE_NEURALX", "repeat": 1}},
                 "text": "Neural X",
-                "location": {
-                    "x": 0,
-                    "y": 1
-                },
-                "size": {
-                    "height": 1,
-                    "width": 1
-                },
-                "type": "text"
+                "location": {"x": 0, "y": 1},
+                "size": {"height": 1, "width": 1},
+                "type": "text",
             },
             {
-                "command": {
-                    "cmd_id": "remote.send",
-                    "params": {"command": "MODE_AUTO_DISPLAY", "repeat": 1}
-                },
+                "command": {"cmd_id": "remote.send", "params": {"command": "MODE_AUTO_DISPLAY", "repeat": 1}},
                 "text": "Auto Display",
-                "location": {
-                    "x": 1,
-                    "y": 1
-                },
-                "size": {
-                    "height": 1,
-                    "width": 1
-                },
-                "type": "text"
-            }
-        ]
+                "location": {"x": 1, "y": 1},
+                "size": {"height": 1, "width": 1},
+                "type": "text",
+            },
+        ],
     }
 ]

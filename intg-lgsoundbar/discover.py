@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-This module implements a discovery function for Orange TV.
-
-"""
+"""This module implements a discovery function for Orange TV."""
 
 import asyncio
 import logging
@@ -43,9 +40,7 @@ SCPD_SERIALNUMBER = f"{SCPD_XMLNS}serialNumber"
 SCPD_FRIENDLYNAME = f"{SCPD_XMLNS}friendlyName"
 SCPD_PRESENTATIONURL = f"{SCPD_XMLNS}presentationURL"
 
-SUPPORTED_DEVICETYPES = [
-    "urn:schemas-upnp-org:device:MediaRenderer:1"
-]
+SUPPORTED_DEVICETYPES = ["urn:schemas-upnp-org:device:MediaRenderer:1"]
 
 SUPPORTED_MANUFACTURERS = ["Panasonic"]
 
@@ -105,7 +100,7 @@ async def async_send_ssdp_broadcast() -> Set[str]:
     Returns a set of SCPD XML resource urls for all discovered devices.
     """
     # Send up to three different broadcast messages
-    #TODO get_local_ips raise errors on some VM
+    # TODO get_local_ips raise errors on some VM
     # ips = get_local_ips()
     # Prepare output of responding devices
     urls = set()
@@ -126,7 +121,6 @@ async def async_send_ssdp_broadcast() -> Set[str]:
 
 async def async_send_ssdp_broadcast_ip(ip_addr: str) -> Set[str]:
     """Send SSDP broadcast messages to a single IP."""
-
     try:
         # Ignore 169.254.0.0/16 addresses
         if ip_addr.startswith("169.254."):
@@ -149,6 +143,7 @@ async def async_send_ssdp_broadcast_ip(ip_addr: str) -> Set[str]:
         _LOGGER.debug("Got %s results after SSDP queries using ip %s", len(protocol.urls), ip_addr)
 
         return protocol.urls
+    # pylint: disable=W0718
     except Exception:
         return set()
 
@@ -197,7 +192,7 @@ def evaluate_scpd_xml(url: str, body: str) -> Optional[Dict]:
         DefusedXmlException,
         ParseError,
         UnicodeDecodeError,
-    ) as err:
+    ):
         # _LOGGER.error("Error occurred during evaluation of SCPD XML from URI %s: %s", url, err)
         return None
 

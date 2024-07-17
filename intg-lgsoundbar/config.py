@@ -38,20 +38,24 @@ def device_from_entity_id(entity_id: str) -> str | None:
 
 @dataclass
 class DeviceInstance:
-    """Orange TV device configuration."""
+    """LG Soundbar device configuration."""
 
+    # pylint: disable = W0622
     id: str
     name: str
     address: str
     port: int
     volume_step: float
+    always_on: bool
 
-    def __init__(self, id, name, address, port, volume_step):
+    def __init__(self, id, name, address, port, volume_step, always_on):
+        """Initialize a config device instance."""
         self.id = id
         self.name = name
         self.address = address
         self.port = port
         self.volume_step = volume_step
+        self.always_on = always_on
 
 
 class _EnhancedJSONEncoder(json.JSONEncoder):

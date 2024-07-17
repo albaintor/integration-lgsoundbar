@@ -12,6 +12,7 @@ from enum import IntEnum
 import config
 from client import LGDevice
 from config import DeviceInstance
+from const import States
 from ucapi import (
     AbortDriverSetup,
     DriverSetupRequest,
@@ -23,8 +24,6 @@ from ucapi import (
     SetupError,
     UserDataResponse,
 )
-
-from const import States
 
 _LOG = logging.getLogger(__name__)
 
@@ -60,9 +59,7 @@ _user_input_discovery = RequestUserInput(
                 "en": "Volume step",
                 "fr": "Pallier de volume",
             },
-            "field": {
-                "number": {"value": 1, "min": 0.5, "max": 10, "steps": 1, "decimals": 1, "unit": {"en": "dB"}}
-            },
+            "field": {"number": {"value": 1, "min": 0.5, "max": 10, "steps": 1, "decimals": 1, "unit": {"en": "dB"}}},
         },
         {
             "id": "info",
@@ -255,9 +252,9 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
     :param msg: response data from the requested user data
     :return: the setup action on how to continue
     """
+    # pylint: disable=W0718,R0911
     global _setup_step
     global _discovered_devices
-
     _discovered_devices = []
 
     config.devices.clear()  # triggers device instance removal
@@ -277,8 +274,11 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         _LOG.debug("Starting manual driver setup for %s", address)
         try:
             # simple connection check
-            device = LGDevice(device_config=DeviceInstance(id=address, address=address, port=int(port),
-                                                           volume_step=volume_step, name="LG"))
+            device = LGDevice(
+                device_config=DeviceInstance(
+                    id=address, address=address, port=int(port), volume_step=volume_step, name="LG", always_on=False
+                )
+            )
             await device.update()
             await asyncio.sleep(3)
             if device.state == States.UNKNOWN:
@@ -311,6 +311,14 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                     "fr": "Sélectionnez votre barre de son LG",
                 },
             },
+            {
+                "id": "always_on",
+                "label": {
+                    "en": "Keep connection alive (faster initialization, but consumes more battery)",
+                    "fr": "Conserver la connexion active (lancement plus rapide, mais consomme plus de batterie)",
+                },
+                "field": {"checkbox": {"value": False}},
+            },
         ],
     )
 
@@ -324,17 +332,18 @@ async def handle_device_choice(msg: UserDataResponse) -> SetupComplete | SetupEr
     :param msg: response data from the requested user data
     :return: the setup action on how to continue: SetupComplete if a valid AVR device was chosen.
     """
+    # pylint: disable=W0602
     global _discovered_devices
     host = msg.input_values["choice"]
-    device: LGDevice|None = None
+    always_on = msg.input_values.get("always_on") == "true"
+    device: LGDevice | None = None
     if _discovered_devices:
         for _device in _discovered_devices:
-            if _device._hostname == host:
+            if _device.hostname == host:
                 device = _device
                 break
 
-
-    _LOG.debug(f"Chosen LG device: {device.device_name} {device.hostname}.")
+    _LOG.debug("Chosen LG device: %s %s", device.device_name, device.hostname)
 
     assert device
     unique_id = device.hostname
@@ -344,8 +353,14 @@ async def handle_device_choice(msg: UserDataResponse) -> SetupComplete | SetupEr
         return SetupError(error_type=IntegrationSetupError.OTHER)
 
     config.devices.add(
-        DeviceInstance(id=unique_id, name=device.device_name, address=device.hostname, port=device.port,
-                       volume_step=device.volume_step)
+        DeviceInstance(
+            id=unique_id,
+            name=device.device_name,
+            address=device.hostname,
+            port=device.port,
+            volume_step=device.volume_step,
+            always_on=always_on,
+        )
     )  # triggers Panasonic BR instance creation
     config.devices.store()
 

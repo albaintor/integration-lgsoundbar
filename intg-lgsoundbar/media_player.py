@@ -11,10 +11,17 @@ from typing import Any
 import client
 from client import LGDevice
 from config import DeviceInstance, create_entity_id
+from const import LG_SIMPLE_COMMANDS, MEDIA_PLAYER_STATE_MAPPING
 from ucapi import EntityTypes, MediaPlayer, StatusCodes
-from ucapi.media_player import Attributes, Commands, DeviceClasses, Features, States, MediaType, Options
-
-from const import MEDIA_PLAYER_STATE_MAPPING, LG_SIMPLE_COMMANDS
+from ucapi.media_player import (
+    Attributes,
+    Commands,
+    DeviceClasses,
+    Features,
+    MediaType,
+    Options,
+    States,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -27,7 +34,7 @@ class LGMediaPlayer(MediaPlayer):
         self._device = device
         _LOG.debug("LGSoundbar media player init")
         entity_id = create_entity_id(config_device.id, EntityTypes.MEDIA_PLAYER)
-        #TODO add additional buttons if possible
+        # TODO add additional buttons if possible
         features = [
             Features.ON_OFF,
             Features.TOGGLE,
@@ -69,24 +76,17 @@ class LGMediaPlayer(MediaPlayer):
             Attributes.SOURCE_LIST: device.source_list if device.source_list else [],
             Attributes.SOUND_MODE: device.sound_mode,
             Attributes.SOUND_MODE_LIST: device.sound_mode_list,
-            Attributes.MEDIA_TYPE: MediaType.VIDEO, #TODO to improve based on PLAY_INFO.i_stream_type
+            Attributes.MEDIA_TYPE: MediaType.VIDEO,  # TODO to improve based on PLAY_INFO.i_stream_type
             Attributes.MEDIA_IMAGE_URL: device.media_image_url,
             Attributes.MEDIA_POSITION: device.media_position,
             Attributes.MEDIA_DURATION: device.media_duration,
             Attributes.MEDIA_TITLE: device.media_title,
-            Attributes.MEDIA_ARTIST: device.media_artist
+            Attributes.MEDIA_ARTIST: device.media_artist,
         }
 
-        options = {
-            Options.SIMPLE_COMMANDS: LG_SIMPLE_COMMANDS
-        }
+        options = {Options.SIMPLE_COMMANDS: LG_SIMPLE_COMMANDS}
         super().__init__(
-            entity_id,
-            config_device.name,
-            features,
-            attributes,
-            device_class=DeviceClasses.SPEAKER,
-            options=options
+            entity_id, config_device.name, features, attributes, device_class=DeviceClasses.SPEAKER, options=options
         )
 
     async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
@@ -99,38 +99,37 @@ class LGMediaPlayer(MediaPlayer):
         :param params: optional command parameters
         :return: status code of the command request
         """
+        # pylint: disable=R0911
         _LOG.info("Got %s command request: %s %s", self.id, cmd_id, params)
 
         if self._device is None:
             _LOG.warning("No device instance for entity: %s", self.id)
             return StatusCodes.SERVICE_UNAVAILABLE
-        elif cmd_id == Commands.ON:
+        if cmd_id == Commands.ON:
             return await self._device.turn_on()
-        elif cmd_id == Commands.OFF:
+        if cmd_id == Commands.OFF:
             return await self._device.turn_off()
-        elif cmd_id == Commands.TOGGLE:
+        if cmd_id == Commands.TOGGLE:
             return await self._device.toggle()
-        elif cmd_id == Commands.VOLUME:
-            res = await self._device.set_volume_level(params.get("volume"))
-        elif cmd_id == Commands.VOLUME_UP:
+        if cmd_id == Commands.VOLUME:
+            return await self._device.set_volume_level(params.get("volume"))
+        if cmd_id == Commands.VOLUME_UP:
             return await self._device.volume_up()
-        elif cmd_id == Commands.VOLUME_DOWN:
+        if cmd_id == Commands.VOLUME_DOWN:
             return await self._device.volume_down()
-        elif cmd_id == Commands.MUTE_TOGGLE:
+        if cmd_id == Commands.MUTE_TOGGLE:
             return await self._device.mute_toggle()
-        elif cmd_id == Commands.MUTE:
+        if cmd_id == Commands.MUTE:
             return await self._device.mute(True)
-        elif cmd_id == Commands.UNMUTE:
+        if cmd_id == Commands.UNMUTE:
             return await self._device.mute(False)
-        elif cmd_id == Commands.SELECT_SOURCE:
-            res = await self._device.select_source(params.get("source"))
-        elif cmd_id == Commands.SELECT_SOUND_MODE:
-            res = await self._device.select_sound_mode(params.get("mode"))
-        elif cmd_id in self.options[Options.SIMPLE_COMMANDS]:
+        if cmd_id == Commands.SELECT_SOURCE:
+            return await self._device.select_source(params.get("source"))
+        if cmd_id == Commands.SELECT_SOUND_MODE:
+            return await self._device.select_sound_mode(params.get("mode"))
+        if cmd_id in self.options[Options.SIMPLE_COMMANDS]:
             return await self._device.send_command(cmd_id)
-        else:
-            return StatusCodes.NOT_IMPLEMENTED
-        return res
+        return StatusCodes.NOT_IMPLEMENTED
 
     def filter_changed_attributes(self, update: dict[str, Any]) -> dict[str, Any]:
         """
@@ -157,7 +156,7 @@ class LGMediaPlayer(MediaPlayer):
             Attributes.MEDIA_POSITION,
             Attributes.MEDIA_DURATION,
             Attributes.MEDIA_TITLE,
-            Attributes.MEDIA_ARTIST
+            Attributes.MEDIA_ARTIST,
         ]:
             if attr in update:
                 attributes = self._key_update_helper(attr, update[attr], attributes)
@@ -188,6 +187,7 @@ class LGMediaPlayer(MediaPlayer):
         return attributes
 
     def _key_update_helper(self, key: str, value: str | None, attributes):
+        # pylint: disable=R0801
         if value is None:
             return attributes
 
