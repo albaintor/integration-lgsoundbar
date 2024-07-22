@@ -1,14 +1,15 @@
 {
 	"driver_id": "uc_lgsoundbar_driver",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"min_core_api": "0.20.0",
 	"name": { "en": "LG Soundbars" },
 	"icon": "custom:lg.png",
     "port": 9091,
+	"device_discovery": true,
 	"description": {
-		"en": "Control your LG Soundbars with Remote Two.",
-		"de": "Steuere LG Soundbars mit Remote Two.",
-		"fr": "Contrôler votre LG Soundbars avec Remote Two."
+		"en": "Control your LG Soundbars with Remote Two and Remote Three.",
+		"de": "Steuere LG Soundbars mit Remote Two und Remote Three.",
+		"fr": "Contrôler vos barres de son LG avec Remote Two et Remote Three."
 	},
 	"developer": {
 		"name": "Unfolded Circle ApS",
@@ -41,5 +42,5 @@
 			}
 		]
 	},
-	"release_date": "2024-06-12"
+	"release_date": "2024-07-22"
 }
