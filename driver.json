@@ -4,8 +4,6 @@
 	"min_core_api": "0.20.0",
 	"name": { "en": "LG Soundbars" },
 	"icon": "custom:lg.png",
-    "port": 9091,
-	"device_discovery": true,
 	"description": {
 		"en": "Control your LG Soundbars with Remote Two and Remote Three.",
 		"de": "Steuere LG Soundbars mit Remote Two und Remote Three.",
