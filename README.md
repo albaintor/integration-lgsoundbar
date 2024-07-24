@@ -73,8 +73,6 @@ directory.
 
 Available commands for remote entity :
 
-TODO
-
 | Command                        | Description               |
 |--------------------------------|---------------------------|
 | MODE_NIGHT                     | Night mode                |
@@ -83,6 +81,12 @@ TODO
 | MODE_NEURALX                   | Neural X                  |
 | MODE_TV_REMOTE                 | Control TV                |
 | MODE_AUTO_DISPLAY              | Auto display              |
+| on                             | Power On                  |
+| off                            | Power Off                 |
+| toggle                         | Power toggle              |
+| volume_up                      | Volume Up                 |
+| volume_down                    | Volume Down               |
+| mute                           | Mute toggle               |
 
 
 ## Build self-contained binary for Remote Two
