@@ -147,6 +147,8 @@ class LGDevice:
         self._auto_display = False
         self._reconnect_retry = 0
         self._update_task = None
+        self._stream_type = 0
+        self._play_control = 0
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
@@ -231,6 +233,7 @@ class LGDevice:
             if len(current_sound_modes) != len(self.sound_mode_list):
                 update_data[Attributes.SOUND_MODE_LIST] = self.sound_mode_list
         elif response["msg"] == "PLAY_INFO":
+            current_playstate = self.play_state
             current_title = self.media_title
             current_artist = self.media_artist
             current_position = self.media_position
@@ -250,6 +253,10 @@ class LGDevice:
                     self._media_duration = 0
             if "s_albumart" in data:
                 self._media_artwork = data["s_albumart"]
+            if "i_stream_type" in data:
+                self._stream_type = data.get("i_stream_type", 0)
+            if "i_play_ctrl" in data:
+                self._play_control = data.get("i_play_ctrl", 0)
 
             if current_title != self.media_title:
                 update_data[Attributes.MEDIA_TITLE] = self.media_title
@@ -365,12 +372,23 @@ class LGDevice:
         return self._volume_step
 
     @property
+    def play_state(self):
+        if self._stream_type == 0:
+            return States.UNKNOWN
+        if self._play_control == 1:
+            return States.PAUSED
+        return States.PLAYING
+
+
+    @property
     def state(self) -> States:
         """State of the device."""
         if not self._power_state:
             self._state = States.OFF
         else:
             self._state = States.ON
+        if self.play_state != States.UNKNOWN:
+            return self.play_state
         return self._state
 
     @property
