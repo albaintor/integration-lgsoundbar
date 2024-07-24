@@ -123,7 +123,7 @@ class LGDevice:
         self._function = -1
         self._functions = []
         self._equaliser = -1
-        self._equalisers = []
+        self._equalisers: list[int] = []
         self._mute = False
         self._rear_volume = 0
         self._rear_volume_min = 0
@@ -160,10 +160,12 @@ class LGDevice:
                 self._bass = data["i_bass"]
             if "i_treble" in data:
                 self._treble = data["i_treble"]
-            if "ai_eq_list" in data:
+            if "ai_eq_list" in data and len(self._equalisers) != len(data["ai_eq_list"]):
                 self._equalisers = data["ai_eq_list"]
-            if "i_curr_eq" in data:
+                update_data[Attributes.SOUND_MODE_LIST] = self.sound_mode_list
+            if "i_curr_eq" in data and self._equaliser != data["i_curr_eq"]:
                 self._equaliser = data["i_curr_eq"]
+                update_data[Attributes.SOUND_MODE] = self.sound_mode
         if response["msg"] == "SPK_LIST_VIEW_INFO":
             current_volume = self.volume
             current_mute = self.muted
@@ -198,8 +200,6 @@ class LGDevice:
             if len(current_functions) != len(self.source_list):
                 update_data[Attributes.SOURCE_LIST] = self.source_list
         elif response["msg"] == "SETTING_VIEW_INFO":
-            current_sound_mode = self.sound_mode
-            current_sound_modes = self.sound_mode_list
             if "i_rear_min" in data:
                 self._rear_volume_min = data["i_rear_min"]
             if "i_rear_max" in data:
@@ -228,10 +228,6 @@ class LGDevice:
                 self._tv_remote = data["b_tv_remote"]
             if "b_auto_display" in data:
                 self._auto_display = data["b_auto_display"]
-            if current_sound_mode != self.sound_mode:
-                update_data[Attributes.SOUND_MODE] = self.sound_mode
-            if len(current_sound_modes) != len(self.sound_mode_list):
-                update_data[Attributes.SOUND_MODE_LIST] = self.sound_mode_list
         elif response["msg"] == "PLAY_INFO":
             current_playstate = self.play_state
             current_title = self.media_title
