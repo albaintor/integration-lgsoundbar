@@ -182,6 +182,9 @@ class LGDevice:
                 self._mute = data["b_mute"]
             if "i_curr_func" in data:
                 self._function = data["i_curr_func"]
+                if self.check_source(self._function):
+                    update_data[Attributes.SOURCE_LIST] = self.source_list
+
             if current_state != self.state:
                 update_data[Attributes.STATE] = self.state
             if current_volume != self.volume:
@@ -193,8 +196,11 @@ class LGDevice:
             current_functions = self.source_list
             if "i_curr_func" in data:
                 self._function = data["i_curr_func"]
+                if self.check_source(self._function):
+                    update_data[Attributes.SOURCE_LIST] = self.source_list
             if "ai_func_list" in data:
-                self._functions = data["ai_func_list"]
+                if len(data["ai_func_list"]) > len(self._functions):
+                    self._functions = data["ai_func_list"]
             if current_source != self.source:
                 update_data[Attributes.SOURCE] = self.source
             if len(current_functions) != len(self.source_list):
@@ -313,7 +319,8 @@ class LGDevice:
                     _LOGGER.debug("Device %s is on again", self.id)
             await self.update()
             await asyncio.sleep(10)
-
+        if not self._device_config.always_on:
+            self._device.disconnect()
         self._update_task = None
 
     async def disconnect(self):
@@ -331,6 +338,7 @@ class LGDevice:
         await self._update_lock.acquire()
         # if self._session is None:
         #     await self.connect()
+        self._device.connect()
         self._device.get_eq()
         self._device.get_info()
         self._device.get_func()
@@ -417,7 +425,7 @@ class LGDevice:
         return functions[self._function]
 
     @property
-    def source_list(self):
+    def source_list(self) -> list[str]:
         """List of available input sources."""
         return sorted(functions[function] for function in self._functions if function < len(functions))
 
@@ -541,6 +549,34 @@ class LGDevice:
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: mute})
         # await self.update_volume()
 
+    def check_source(self, source_id) -> bool:
+        if source_id not in self._functions:
+            self._functions.append(source_id)
+            return True
+        return False
+
+    @cmd_wrapper
+    async def source_next(self):
+        """Send next input source command to AVR."""
+        if self._function == -1 or self._function >= len(functions):
+            _LOGGER.debug("Not available to select next source: %s", self._function)
+            return
+        sources = self.source_list
+        try:
+            index = sources.index(self.source)
+        except ValueError:
+            index = 0
+        try:
+            index += 1
+            if index >= len(sources):
+                index = 0
+            self._function = functions.index(sources[index])
+            self._device.set_func(self._function)
+            self._device.get_func()
+        except ValueError:
+            _LOGGER.warning("Error select next source: %s", self._function)
+            pass
+
     @cmd_wrapper
     async def send_command(self, command):
         """Send a command to the device."""
@@ -556,6 +592,8 @@ class LGDevice:
             self._device.set_tv_remote(not self._tv_remote)
         elif command == "MODE_AUTO_DISPLAY":
             self._device.set_auto_display(not self._auto_display)
+        elif command == "INPUT_NEXT":
+            await self.source_next()
         elif command == Commands.ON:
             self._device.power(True)
         elif command == Commands.OFF:
