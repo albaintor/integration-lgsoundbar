@@ -35,7 +35,6 @@ Supported commands for remote entity :
 
 ## Todo
 - Add missing commands : I had to sniff the network requests between the mobile app and the soundbar to grab missing commands. However the mobile app is limited and does not reproduce the physical buttons of the remote. So I have no idea how to make play/pause, next/previous, and simulate the direction pad. Maybe this is not possible
-- Optimize the refresh : the integration is based on polling (5 seconds) and it consumes battery. One optimization would be to stop the refresh when the device is off, and enable it again on keypress for a while.
 - Optimize the requests : actually the requests are not in sync with responses. This is not a problem but it could be optimized to have real sync.
 
 
