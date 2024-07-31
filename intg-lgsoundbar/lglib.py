@@ -47,6 +47,11 @@ functions = ["Wi-Fi", "Bluetooth", "Portable", "Aux", "Optical", "CP", "HDMI",
              "Chromecast", "Optical/HDMI ARC", "LG Optical", "FM", "USB", "USB2",
              "E-ARC"]
 
+functions_map = {
+    "Optical": "Optical/HDMI ARC",
+    "ARC": "Optical/HDMI ARC",
+}
+
 WIFI = 0
 BLUETOOTH = 1
 PORTABLE = 2
