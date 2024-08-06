@@ -257,8 +257,6 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
     global _discovered_devices
     _discovered_devices = []
 
-    config.devices.clear()  # triggers device instance removal
-
     dropdown_items = []
     address = msg.input_values["address"]
     port = msg.input_values["port"]
