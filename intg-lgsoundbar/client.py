@@ -18,7 +18,7 @@ import ucapi.media_player
 from aiohttp import ClientError, ClientSession
 from config import DeviceInstance
 from const import States
-from pyee import AsyncIOEventEmitter
+from pyee.asyncio import AsyncIOEventEmitter
 from ucapi.media_player import Attributes, Commands
 
 from lglib import Temescal, equalisers, functions
