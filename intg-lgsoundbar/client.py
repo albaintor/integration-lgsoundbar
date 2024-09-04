@@ -19,7 +19,7 @@ from aiohttp import ClientError, ClientSession
 from config import DeviceInstance
 from const import States
 from pyee.asyncio import AsyncIOEventEmitter
-from ucapi.media_player import Attributes, Commands
+from ucapi.media_player import Attributes, Commands, MediaType
 
 from lglib import Temescal, equalisers, functions
 
@@ -359,6 +359,26 @@ class LGDevice:
     def id(self):
         """Identifier of the device."""
         return self._id
+
+    @property
+    def attributes(self) -> dict[str, any]:
+        """Return the device attributes."""
+        updated_data = {
+            Attributes.STATE: self.state,
+            Attributes.SOURCE_LIST: self.source_list,
+            Attributes.SOURCE: self.source if self.source else "",
+            Attributes.MEDIA_TYPE: MediaType.VIDEO,
+            Attributes.SOUND_MODE_LIST: self.sound_mode_list,
+            Attributes.SOUND_MODE: self.sound_mode if self.sound_mode else "",
+            Attributes.MUTED: self.muted,
+            Attributes.VOLUME: self.volume,
+            Attributes.MEDIA_IMAGE_URL: self.media_image_url,
+            Attributes.MEDIA_DURATION: self.media_duration,
+            Attributes.MEDIA_POSITION: self.media_position,
+            Attributes.MEDIA_TITLE: self.media_title,
+            Attributes.MEDIA_ARTIST: self.media_artist
+        }
+        return updated_data
 
     @property
     def hostname(self):

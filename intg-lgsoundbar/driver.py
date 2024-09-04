@@ -23,7 +23,7 @@ import websockets
 from client import LGDevice
 from config import device_from_entity_id
 from ucapi.api import IntegrationAPI, filter_log_msg_data
-from ucapi.media_player import Attributes as MediaAttr
+from ucapi.media_player import Attributes as MediaAttr, States
 from ucapi.media_player import MediaType
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
@@ -101,14 +101,14 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
         device_id = device_from_entity_id(entity_id)
         if device_id in _configured_devices:
             device = _configured_devices[device_id]
+            attributes = device.attributes
+            _LOG.debug("Subscribe entity %s, attributes : %s", entity_id, attributes)
             if isinstance(entity, media_player.LGMediaPlayer):
-                api.configured_entities.update_attributes(
-                    entity_id, {ucapi.media_player.Attributes.STATE: media_player.state_from_device(device.state)}
-                )
+                api.configured_entities.update_attributes(entity_id, attributes)
             if isinstance(entity, remote.LGRemote):
-                api.configured_entities.update_attributes(
-                    entity_id, {ucapi.remote.Attributes.STATE: remote.LG_REMOTE_STATE_MAPPING.get(device.state)}
-                )
+                attributes[ucapi.remote.Attributes.STATE] = remote.LG_REMOTE_STATE_MAPPING.get(
+                    attributes.get(MediaAttr.STATE, States.UNKNOWN))
+                api.configured_entities.update_attributes(entity_id, attributes)
             continue
 
         device = config.devices.get(device_id)
