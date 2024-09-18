@@ -149,6 +149,7 @@ class LGDevice:
         self._update_task = None
         self._stream_type = 0
         self._play_control = 0
+        self._serial_number = None
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
@@ -166,7 +167,7 @@ class LGDevice:
             if "i_curr_eq" in data and self._equaliser != data["i_curr_eq"]:
                 self._equaliser = data["i_curr_eq"]
                 update_data[Attributes.SOUND_MODE] = self.sound_mode
-        if response["msg"] == "SPK_LIST_VIEW_INFO":
+        elif response["msg"] == "SPK_LIST_VIEW_INFO":
             current_volume = self.volume
             current_mute = self.muted
             current_state = self.state
@@ -271,6 +272,10 @@ class LGDevice:
             if current_artwork != self.media_image_url:
                 update_data[Attributes.MEDIA_IMAGE_URL] = self.media_image_url
 
+        elif response["msg"] == "PRODUCT_INFO":
+            if "s_uuid" in data:
+                self._serial_number = data["s_uuid"]
+
         if update_data:
             self.events.emit(Events.UPDATE, self.id, update_data)
 
@@ -330,7 +335,7 @@ class LGDevice:
         #     self._session = None
         self._device.disconnect()
 
-    async def update(self):
+    async def update(self, full=False):
         """Trigger updates from the device."""
         if self._update_lock.locked():
             return
@@ -344,6 +349,8 @@ class LGDevice:
         self._device.get_func()
         self._device.get_settings()
         self._device.get_play()
+        if full:
+            self._device.get_product_info()
         self._update_lock.release()
 
     async def update_volume(self):
@@ -384,6 +391,11 @@ class LGDevice:
     def hostname(self):
         """Hostname."""
         return self._hostname
+
+    @property
+    def serial_number(self):
+        """Serial number (UUID)."""
+        return self._serial_number
 
     @property
     def port(self):

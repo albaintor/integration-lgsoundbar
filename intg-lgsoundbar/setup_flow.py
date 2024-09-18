@@ -277,7 +277,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
                     id=address, address=address, port=int(port), volume_step=volume_step, name="LG", always_on=False
                 )
             )
-            await device.update()
+            await device.update(True)
             await asyncio.sleep(3)
             if device.state == States.UNKNOWN:
                 _LOG.error("Cannot connect to manually entered address %s", address)
@@ -344,10 +344,13 @@ async def handle_device_choice(msg: UserDataResponse) -> SetupComplete | SetupEr
     _LOG.debug("Chosen LG device: %s %s", device.device_name, device.hostname)
 
     assert device
-    unique_id = device.hostname
+    if device.serial_number:
+        unique_id = device.serial_number
+    else:
+        unique_id = device.hostname
 
     if unique_id is None:
-        _LOG.error("Could not get mac address of host %s: required to create a unique device", host)
+        _LOG.error("Could not get identifier of host %s: required to create a unique device", host)
         return SetupError(error_type=IntegrationSetupError.OTHER)
 
     config.devices.add(
