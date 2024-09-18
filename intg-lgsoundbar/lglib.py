@@ -8,9 +8,12 @@ LG soundbar library handling of the integration driver.
 import json
 import socket
 import struct
+import logging
 from threading import Thread
 
 from Crypto.Cipher import AES
+
+_LOG = logging.getLogger(__name__)
 
 equalisers = ["Standard", "Bass", "Flat", "Boost", "Treble and Bass", "User",
               "Music", "Cinema", "Night", "News", "Voice", "ia_sound",
@@ -106,8 +109,11 @@ class Temescal:
         """Connect to the device."""
         if self.socket:
             return
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((self.address, self.port))
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.address, self.port))
+        except Exception as ex:
+            _LOG.error("Error while connecting to soundbar", ex)
 
     def disconnect(self):
         """Disconnect from the device."""
