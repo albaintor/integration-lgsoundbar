@@ -17,9 +17,8 @@ from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, 
 import ucapi.media_player
 from aiohttp import ClientError, ClientSession
 from config import DeviceInstance
-from const import States
 from pyee.asyncio import AsyncIOEventEmitter
-from ucapi.media_player import Attributes, Commands, MediaType
+from ucapi.media_player import Attributes, Commands, MediaType, States
 
 from lglib import Temescal, equalisers, functions
 
@@ -464,7 +463,7 @@ class LGDevice:
     @property
     def is_on(self):
         """Return true if on."""
-        return self.state in [States.PAUSED, States.STOPPED, States.PLAYING, States.ON]
+        return self.state in [States.PAUSED, States.BUFFERING, States.PLAYING, States.ON]
 
     @property
     def sound_mode(self):

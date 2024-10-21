@@ -108,7 +108,10 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
             if isinstance(entity, remote.LGRemote):
                 attributes[ucapi.remote.Attributes.STATE] = remote.LG_REMOTE_STATE_MAPPING.get(
                     attributes.get(MediaAttr.STATE, States.UNKNOWN))
-                api.configured_entities.update_attributes(entity_id, attributes)
+                api.configured_entities.update_attributes(entity_id,
+                                                          {ucapi.remote.Attributes.STATE:
+                                                              remote.LG_REMOTE_STATE_MAPPING.get(
+                                                                  attributes.get(MediaAttr.STATE, States.UNKNOWN))})
             continue
 
         device = config.devices.get(device_id)

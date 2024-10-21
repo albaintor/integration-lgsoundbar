@@ -8,10 +8,9 @@ Media-player entity functions.
 import logging
 from typing import Any
 
-import client
 from client import LGDevice
 from config import DeviceInstance, create_entity_id
-from const import LG_SIMPLE_COMMANDS, MEDIA_PLAYER_STATE_MAPPING
+from const import LG_SIMPLE_COMMANDS
 from ucapi import EntityTypes, MediaPlayer, StatusCodes
 from ucapi.media_player import (
     Attributes,
@@ -69,7 +68,7 @@ class LGMediaPlayer(MediaPlayer):
             # Features.NEXT
         ]
         attributes = {
-            Attributes.STATE: state_from_device(device.state),
+            Attributes.STATE: device.state,
             Attributes.VOLUME: device.volume,
             Attributes.MUTED: device.muted,
             Attributes.SOURCE: device.source if device.source else "",
@@ -199,14 +198,3 @@ class LGMediaPlayer(MediaPlayer):
 
         return attributes
 
-
-def state_from_device(client_state: client.States) -> States:
-    """
-    Convert Device state to UC API media-player state.
-
-    :param client_state: Orange STB  state
-    :return: UC API media_player state
-    """
-    if client_state in MEDIA_PLAYER_STATE_MAPPING:
-        return MEDIA_PLAYER_STATE_MAPPING[client_state]
-    return States.UNKNOWN

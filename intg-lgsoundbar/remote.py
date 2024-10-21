@@ -8,13 +8,14 @@ import asyncio
 import logging
 from typing import Any
 
+from ucapi.media_player import States
+
 from client import LGDevice
 from config import DeviceInstance, create_entity_id
 from const import (
     LG_REMOTE_BUTTONS_MAPPING,
     LG_REMOTE_UI_PAGES,
     LG_SIMPLE_COMMANDS,
-    States,
 )
 from ucapi import EntityTypes, Remote, StatusCodes
 from ucapi.remote import Attributes, Commands, Features, Options
@@ -29,7 +30,7 @@ LG_REMOTE_STATE_MAPPING = {
     States.ON: RemoteStates.ON,
     States.PLAYING: RemoteStates.ON,
     States.PAUSED: RemoteStates.ON,
-    States.STOPPED: RemoteStates.ON,
+    States.BUFFERING: RemoteStates.ON,
 }
 
 
