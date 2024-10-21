@@ -9,10 +9,11 @@ import asyncio
 import logging
 from enum import IntEnum
 
+from ucapi.media_player import States
+
 import config
 from client import LGDevice
 from config import DeviceInstance
-from const import States
 from ucapi import (
     AbortDriverSetup,
     DriverSetupRequest,
