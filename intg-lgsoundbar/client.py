@@ -8,7 +8,7 @@ This module implements the LG soundbar communication of the Remote Two integrati
 # coding: utf-8
 import asyncio
 import logging
-from asyncio import CancelledError, Lock
+from asyncio import CancelledError, Lock, shield
 from datetime import timedelta
 from enum import IntEnum
 from functools import wraps
@@ -73,7 +73,7 @@ def cmd_wrapper(
             await asyncio.sleep(0)
             try:
                 async with asyncio.timeout(5):
-                    await connect_task
+                    await shield(connect_task)
             except asyncio.TimeoutError:
                 log_function("Timeout for reconnect, command won't be sent")
             else:
@@ -149,6 +149,7 @@ class LGDevice:
         self._stream_type = 0
         self._play_control = 0
         self._serial_number = None
+        self._connect_lock = Lock()
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
@@ -280,17 +281,18 @@ class LGDevice:
 
     async def connect(self):
         """Connect to a LG soundbar."""
-        # if self._session:
-        #     await self._session.close()
-        #     self._session = None
-        # session_timeout = aiohttp.ClientTimeout(total=None, sock_connect=self._timeout, sock_read=self._timeout)
-        # self._session = aiohttp.ClientSession(timeout=session_timeout,
-        #                                       raise_for_status=True)
-        # self._device.connect()
-        self._device.connect()
-        await self.update()
-        await self.start_polling()
-        self.events.emit(Events.CONNECTED, self.id)
+        if self._connect_lock.locked():
+            _LOGGER.debug("Connection already in progress")
+            return
+        try:
+            await self._connect_lock.acquire()
+            self._device.connect()
+            await self.update()
+            await self.start_polling()
+            self.events.emit(Events.CONNECTED, self.id)
+        except Exception as ex:
+            _LOGGER.error("Failed to connect %s", ex)
+        self._connect_lock.release()
 
     async def start_polling(self):
         """Start polling task."""
