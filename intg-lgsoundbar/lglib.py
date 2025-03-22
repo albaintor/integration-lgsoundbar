@@ -4,12 +4,12 @@ LG soundbar library handling of the integration driver.
 :copyright: (c) 2023 by Unfolded Circle ApS.
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
-
+import asyncio
 import json
-import socket
-import struct
 import logging
-from threading import Thread
+import struct
+from asyncio import Server, BaseTransport, Task, Transport
+from typing import Callable, Any, Awaitable
 
 from Crypto.Cipher import AES
 
@@ -88,10 +88,10 @@ PLAYING = 0
 PAUSED = 1
 
 
-class Temescal:
+class Temescal(asyncio.Protocol):
     """LG library."""
 
-    def __init__(self, address, port=9741, callback=None, logger=None):
+    def __init__(self, address, port=9741, callback:Callable[[Any], None]|None = None, logger=None):
         """Initialize a LG soundbar device."""
         self.iv = b"'%^Ur7gy$~t+f)%@"
         self.key = b"T^&*J%^7tr~4^%^&I(o%^!jIJ__+a0 k"
@@ -99,62 +99,73 @@ class Temescal:
         self.port = port
         self.callback = callback
         self.logger = logger
-        self.socket = None
-        self.connect()
-        if callback is not None:
-            self.thread = Thread(target=self.listen, daemon=True)
-            self.thread.start()
+        self._transport: Transport | None = None
+        self._loop = asyncio.get_event_loop()
+        self._connected = False
 
-    def connect(self):
+    def connection_made(self, transport: BaseTransport):
+        # peername = transport.get_extra_info('peername')
+        # print('Connection from {}'.format(peername))
+        self._transport = transport
+        self._connected = True
+
+    def data_received(self, data: bytes):
+        if len(data) == 0:
+            self._transport.close()
+            self._transport = None
+            self.connect()
+            return
+
+        if data[0] == 0x10:
+            data = data[1:]
+            length = struct.unpack(">I", data[0:4])[0]
+            data = data[4:]
+            data = data[:length]
+            if len(data) % 16 != 0:
+                return
+            response = self.decrypt_packet(data)
+            if response is not None:
+                # Better to create a task ?
+                #self.callback(json.loads(response))
+                asyncio.create_task(self.handle_response(response))
+
+    async def handle_response(self, response):
+        self.callback(json.loads(response))
+
+    async def _connection_task(self):
+        self._transport, protocol = await self._loop.create_connection(
+            lambda: self,
+            host=self.address, port=self.port)
+
+    async def connect(self):
         """Connect to the device."""
-        if self.socket:
+        if self._transport:
             return
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.address, self.port))
+            await asyncio.wait_for(self._connection_task(), timeout=5)
+            _LOG.debug("Server connected %s", self.connected)
         except Exception as ex:
-            _LOG.error("Error while connecting to soundbar", ex)
+            _LOG.error("Unable to connect %s", ex)
+
+        # self._transport, protocol = await self._loop.create_connection(
+        #     lambda: self,
+        #     host=self.address, port=self.port)
 
     def disconnect(self):
         """Disconnect from the device."""
-        if self.socket:
-            try:
-                self.socket.close()
-            # pylint: disable=W0718
-            except Exception:
-                pass
-            self.socket = None
+        if self._transport:
+            self._transport.close()
+            self._transport = None
+            self._connected = False
 
     def reconnect(self):
         """Reconnect."""
         self.disconnect()
         self.connect()
 
-    def listen(self):
-        """Listen for device responses."""
-        data = None
-        while True:
-            try:
-                data = self.socket.recv(1)
-            # pylint: disable=W0718
-            except Exception:
-                self.connect()
-
-            if len(data) == 0:  # the soundbar closed the connection, recreate it
-                self.socket.shutdown(socket.SHUT_RDWR)
-                self.socket.close()
-                self.connect()
-                continue
-
-            if data[0] == 0x10:
-                data = self.socket.recv(4)
-                length = struct.unpack(">I", data)[0]
-                data = self.socket.recv(length)
-                if len(data) % 16 != 0:
-                    continue
-                response = self.decrypt_packet(data)
-                if response is not None:
-                    self.callback(json.loads(response))
+    @property
+    def connected(self) -> bool:
+        return self._connected
 
     def encrypt_packet(self, data):
         """Encrypt packet to send to the device."""
@@ -180,14 +191,19 @@ class Temescal:
     def send_packet(self, data):
         """Send a packet."""
         # pylint: disable=W0718
+        if self._transport is None:
+            _LOG.debug("Cannot send any packet, no connection active")
+            return
         packet = self.encrypt_packet(json.dumps(data))
         try:
-            self.socket.send(packet)
-        except Exception:
+            self._transport.write(packet)
+        except Exception as ex:
+            _LOG.error("Error sending packet %s", ex)
             try:
-                self.connect()
-                self.socket.send(packet)
+                self._loop.run_until_complete(self.connect)
+                self._transport.write(packet)
             except Exception:
+                _LOG.error("Error sending packet #2 %s", ex)
                 pass
 
     def power(self, value: bool):

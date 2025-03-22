@@ -8,7 +8,7 @@ This module implements the LG soundbar communication of the Remote Two integrati
 # coding: utf-8
 import asyncio
 import logging
-from asyncio import CancelledError, Lock, shield
+from asyncio import CancelledError, Lock, shield, Task
 from datetime import timedelta
 from enum import IntEnum
 from functools import wraps
@@ -150,12 +150,20 @@ class LGDevice:
         self._play_control = 0
         self._serial_number = None
         self._connect_lock = Lock()
+        self._equalizer_event = asyncio.Event()
+        self._volume_event = asyncio.Event()
+        self._info_event = asyncio.Event()
+        self._source_event = asyncio.Event()
+        self._playback_info_event = asyncio.Event()
+        self._receive_task: Task|None = None
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
+        _LOGGER.debug("Received %s", response)
         # pylint: disable = R0914,R0915
         data = response.get("data") or {}
         update_data = {}
+        #_LOGGER.debug("Received event %s", response)
         if response["msg"] == "EQ_VIEW_INFO":
             if "i_bass" in data:
                 self._bass = data["i_bass"]
@@ -167,6 +175,7 @@ class LGDevice:
             if "i_curr_eq" in data and self._equaliser != data["i_curr_eq"]:
                 self._equaliser = data["i_curr_eq"]
                 update_data[Attributes.SOUND_MODE] = self.sound_mode
+            self._equalizer_event.set()
         elif response["msg"] == "SPK_LIST_VIEW_INFO":
             current_volume = self.volume
             current_mute = self.muted
@@ -185,13 +194,13 @@ class LGDevice:
                 self._function = data["i_curr_func"]
                 if self.check_source(self._function):
                     update_data[Attributes.SOURCE_LIST] = self.source_list
-
             if current_state != self.state:
                 update_data[Attributes.STATE] = self.state
             if current_volume != self.volume:
                 update_data[Attributes.VOLUME] = self.volume
             if current_mute != self.muted:
                 update_data[Attributes.MUTED] = self.muted
+            self._volume_event.set()
         elif response["msg"] == "FUNC_VIEW_INFO":
             current_source = self.source
             current_functions = self.source_list
@@ -206,6 +215,8 @@ class LGDevice:
                 update_data[Attributes.SOURCE] = self.source
             if len(current_functions) != len(self.source_list):
                 update_data[Attributes.SOURCE_LIST] = self.source_list
+            _LOGGER.debug("SOURCES %s", self.source_list)
+            self._source_event.set()
         elif response["msg"] == "SETTING_VIEW_INFO":
             if "i_rear_min" in data:
                 self._rear_volume_min = data["i_rear_min"]
@@ -235,6 +246,7 @@ class LGDevice:
                 self._tv_remote = data["b_tv_remote"]
             if "b_auto_display" in data:
                 self._auto_display = data["b_auto_display"]
+            self._info_event.set()
         elif response["msg"] == "PLAY_INFO":
             current_playstate = self.play_state
             current_title = self.media_title
@@ -271,7 +283,7 @@ class LGDevice:
                 update_data[Attributes.MEDIA_DURATION] = self.media_duration
             if current_artwork != self.media_image_url:
                 update_data[Attributes.MEDIA_IMAGE_URL] = self.media_image_url
-
+            self._playback_info_event.set()
         elif response["msg"] == "PRODUCT_INFO":
             if "s_uuid" in data:
                 self._serial_number = data["s_uuid"]
@@ -286,8 +298,9 @@ class LGDevice:
             return
         try:
             await self._connect_lock.acquire()
-            self._device.connect()
-            await self.update()
+            await self._device.connect()
+            if self._device.connected:
+                await self.update()
             await self.start_polling()
             self.events.emit(Events.CONNECTED, self.id)
         except Exception as ex:
@@ -323,7 +336,8 @@ class LGDevice:
                 elif self._reconnect_retry > 0:
                     self._reconnect_retry = 0
                     _LOGGER.debug("Device %s is on again", self.id)
-            await self.update()
+            if self._device.connected:
+                await self.update()
             await asyncio.sleep(10)
         if not self._device_config.always_on:
             self._device.disconnect()
@@ -344,15 +358,49 @@ class LGDevice:
         await self._update_lock.acquire()
         # if self._session is None:
         #     await self.connect()
-        self._device.connect()
+        await self._device.connect()
+        if self._receive_task is None:
+            self._receive_task = asyncio.create_task(self.receiving_task())
+
+        _LOGGER.debug("Request updates")
         self._device.get_eq()
+        await asyncio.sleep(0.2)
         self._device.get_info()
+        await asyncio.sleep(0.2)
         self._device.get_func()
+        await asyncio.sleep(0.2)
         self._device.get_settings()
+        await asyncio.sleep(0.2)
         self._device.get_play()
+        _LOGGER.debug("Request updates end")
+        try:
+            await asyncio.wait_for(shield(self._receive_task), timeout=5)
+        except asyncio.TimeoutError:
+            _LOGGER.debug("Request updates timeout")
+        try:
+            self._receive_task.cancel()
+        except CancelledError:
+            pass
+        self._receive_task = None
         if full:
             self._device.get_product_info()
         self._update_lock.release()
+
+    # async def event_task(self, event: asyncio.Event, name: str):
+    #     await event.wait()
+    #     _LOGGER.debug("Event received %s", name)
+
+    async def receiving_task(self):
+        # tasks: [asyncio.Task] = []
+        for (event, name) in [(self._volume_event, "Volume event"),
+                      (self._source_event, "Source event"),
+                      (self._info_event, "Info event"),
+                      (self._equalizer_event, "Equalizer event"),
+                       (self._playback_info_event, "Playback info event")
+                      ]:
+            await event.wait()
+            #tasks.append(asyncio.create_task(self.event_task(event, name)))
+        #await asyncio.wait(tasks)
 
     async def update_volume(self):
         """Trigger updates from the device."""
@@ -504,9 +552,15 @@ class LGDevice:
         """Current media duration."""
         return self._media_duration
 
+    @property
+    def device_config(self):
+        """Device configuration."""
+        return self._device_config
+
     @cmd_wrapper
     async def toggle(self):
         """Toggle on or off."""
+        await self.connect()
         if self.state == States.OFF:
             self._device.power(True)
         else:
@@ -527,6 +581,7 @@ class LGDevice:
         """Set volume level, range 0..100."""
         if source is None:
             return ucapi.StatusCodes.BAD_REQUEST
+        _LOGGER.debug("Select source %s", source)
         self._device.set_func(functions.index(source))
 
     @cmd_wrapper

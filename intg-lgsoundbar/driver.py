@@ -82,7 +82,8 @@ async def on_r2_exit_standby() -> None:
 
     for device in _configured_devices.values():
         # start background task
-        await device.connect()
+        if device.device_config.always_on:
+            await device.connect()
 
 
 @api.listens_to(ucapi.Events.SUBSCRIBE_ENTITIES)
