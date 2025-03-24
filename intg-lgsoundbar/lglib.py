@@ -193,7 +193,7 @@ class Temescal(asyncio.Protocol):
         # pylint: disable=W0718
         if self._transport is None:
             _LOG.debug("Cannot send any packet, no connection active")
-            return
+            raise Exception("Cannot send any packet, no connection active")
         packet = self.encrypt_packet(json.dumps(data))
         try:
             self._transport.write(packet)

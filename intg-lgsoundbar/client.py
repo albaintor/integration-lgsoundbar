@@ -54,7 +54,7 @@ def cmd_wrapper(
             await func(obj, *args, **kwargs)
             await obj.start_polling()
             return ucapi.StatusCodes.OK
-        except ClientError as exc:
+        except Exception as exc:
             # If Kodi is off, we expect calls to fail.
             if obj.state == States.OFF:
                 log_function = _LOGGER.debug
@@ -89,10 +89,6 @@ def cmd_wrapper(
                             ex,
                         )
             return ucapi.StatusCodes.BAD_REQUEST
-        # pylint: disable = W0718
-        except Exception as ex:
-            _LOGGER.error("Unknown error %s %s", func.__name__, ex)
-
     return wrapper
 
 
