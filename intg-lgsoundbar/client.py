@@ -113,7 +113,7 @@ class LGDevice:
         self._volume_step = device_config.volume_step
         self._volume = 0
         self._volume_min = 0
-        self._volume_max = 0
+        self._volume_max = 100
         self._power_state = False
         self._function = -1
         self._functions = []
@@ -179,11 +179,11 @@ class LGDevice:
             if "b_powerstatus" in data:
                 self._power_state = data["b_powerstatus"]
             if "i_vol" in data:
-                self._volume = data["i_vol"]
+                self._volume = int(data["i_vol"])
             if "i_vol_min" in data:
-                self._volume_min = data["i_vol_min"]
+                self._volume_min = int(data["i_vol_min"])
             if "i_vol_max" in data:
-                self._volume_max = data["i_vol_max"]
+                self._volume_max = int(data["i_vol_max"])
             if "b_mute" in data:
                 self._mute = data["b_mute"]
             if "i_curr_func" in data:
@@ -487,7 +487,7 @@ class LGDevice:
         """Current volume."""
         if self._volume_max - self._volume_min == 0:
             return 0
-        return 100 * abs((self._volume - self._volume_min) / (self._volume_max - self._volume_min))
+        return int(100 * abs((self._volume - self._volume_min) / (self._volume_max - self._volume_min)))
 
     @property
     def muted(self):
@@ -592,7 +592,7 @@ class LGDevice:
             return ucapi.StatusCodes.BAD_REQUEST
         target_volume = volume * (self._volume_max - self._volume_min) / 100 + self._volume_min
         self._device.set_volume(int(target_volume))
-        self._volume = target_volume
+        self._volume = int(target_volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
 
@@ -602,7 +602,7 @@ class LGDevice:
         volume = self._volume + self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = min(volume, self._volume_max)
         self._device.set_volume(int(volume))
-        self._volume = volume
+        self._volume = int(volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
 
@@ -612,7 +612,7 @@ class LGDevice:
         volume = self._volume - self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = max(volume, self._volume_min)
         self._device.set_volume(int(volume))
-        self._volume = volume
+        self._volume = int(volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
 

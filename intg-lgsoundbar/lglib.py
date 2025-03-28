@@ -8,8 +8,8 @@ import asyncio
 import json
 import logging
 import struct
-from asyncio import Server, BaseTransport, Task, Transport
-from typing import Callable, Any, Awaitable
+from asyncio import BaseTransport, Transport
+from typing import Callable, Any
 
 from Crypto.Cipher import AES
 
