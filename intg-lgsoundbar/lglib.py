@@ -129,6 +129,13 @@ class Temescal(asyncio.Protocol):
                 #self.callback(json.loads(response))
                 asyncio.create_task(self.handle_response(response))
 
+    def connection_lost(self, exc):
+        _LOG.warning("Connection lost with the server, reconnect... (%s)", exc)
+        if self._transport:
+            self._transport.close()
+            self._transport = None
+        self.connect()
+
     async def handle_response(self, response):
         self.callback(json.loads(response))
 
