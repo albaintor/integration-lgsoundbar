@@ -69,7 +69,7 @@ def cmd_wrapper(
             # Kodi not connected, launch a connect task but
             # don't wait more than 5 seconds, then process the command if connected
             # else returns error
-            connect_task = obj.event_loop.create_task(obj.connect())
+            connect_task = obj._event_loop.create_task(obj.connect())
             await asyncio.sleep(0)
             try:
                 async with asyncio.timeout(5):
