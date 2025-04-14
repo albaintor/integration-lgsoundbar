@@ -77,7 +77,7 @@ def cmd_wrapper(
             except asyncio.TimeoutError:
                 log_function("Timeout for reconnect, command won't be sent")
             else:
-                if not obj._connect_error:
+                if obj.connected:
                     try:
                         await func(obj, *args, **kwargs)
                         return ucapi.StatusCodes.OK
