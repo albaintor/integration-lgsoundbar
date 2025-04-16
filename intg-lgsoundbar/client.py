@@ -295,7 +295,7 @@ class LGDevice:
         try:
             await self._connect_lock.acquire()
             await self._device.connect()
-            if self._device.connected:
+            if self.connected:
                 await self.update()
             await self.start_polling()
             self.events.emit(Events.CONNECTED, self.id)
@@ -332,7 +332,7 @@ class LGDevice:
                 elif self._reconnect_retry > 0:
                     self._reconnect_retry = 0
                     _LOGGER.debug("Device %s is on again", self.id)
-            if self._device.connected:
+            if self.connected:
                 await self.update()
             await asyncio.sleep(10)
         if not self._device_config.always_on:
@@ -446,6 +446,12 @@ class LGDevice:
     def port(self):
         """Connection port."""
         return self._port
+
+    @property
+    def connected(self) -> bool:
+        if self._device:
+            return self._device.connected
+        return False
 
     @property
     def volume_step(self):
