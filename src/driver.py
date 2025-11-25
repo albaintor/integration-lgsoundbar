@@ -2,34 +2,38 @@
 """
 This module implements a Remote Two integration driver for Orange STB.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2025 by Albaintor
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
 import asyncio
 import logging
 import os
+import sys
 from typing import Any
+
+import ucapi
+from ucapi.media_player import Attributes as MediaAttr
+from ucapi.media_player import States
 
 import client
 import config
 import media_player
 import remote
 import setup_flow
-import ucapi
 from client import LGDevice
 from config import device_from_entity_id
-from ucapi.media_player import Attributes as MediaAttr, States
-from ucapi.media_player import MediaType
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
-_LOOP = asyncio.get_event_loop()
-
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+_LOOP = asyncio.new_event_loop()
+asyncio.set_event_loop(_LOOP)
 # Global variables
 api = ucapi.IntegrationAPI(_LOOP)
 # Map of device_id -> Orange instance
 _configured_devices: dict[str, LGDevice] = {}
-_R2_IN_STANDBY = False
+_remote_in_standby = False  # pylint: disable=C0103
 
 
 @api.listens_to(ucapi.Events.CONNECT)
@@ -56,8 +60,8 @@ async def on_r2_enter_standby() -> None:
 
     Disconnect every OrangeTV instances.
     """
-    global _R2_IN_STANDBY
-    _R2_IN_STANDBY = True
+    global _remote_in_standby
+    _remote_in_standby = True
     _LOG.debug("Enter standby event: disconnecting device(s)")
     for device in _configured_devices.values():
         # start background task
@@ -71,9 +75,9 @@ async def on_r2_exit_standby() -> None:
 
     Connect all OrangeTV instances.
     """
-    global _R2_IN_STANDBY
+    global _remote_in_standby
 
-    _R2_IN_STANDBY = False
+    _remote_in_standby = False
     _LOG.debug("Exit standby event: connecting device(s)")
 
     for device in _configured_devices.values():
@@ -89,9 +93,9 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
 
     :param entity_ids: entity identifiers.
     """
-    global _R2_IN_STANDBY
+    global _remote_in_standby
 
-    _R2_IN_STANDBY = False
+    _remote_in_standby = False
     _LOG.debug("Subscribe entities event: %s", entity_ids)
     for entity_id in entity_ids:
         entity = api.configured_entities.get(entity_id)
@@ -104,11 +108,16 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                 api.configured_entities.update_attributes(entity_id, attributes)
             if isinstance(entity, remote.LGRemote):
                 attributes[ucapi.remote.Attributes.STATE] = remote.LG_REMOTE_STATE_MAPPING.get(
-                    attributes.get(MediaAttr.STATE, States.UNKNOWN))
-                api.configured_entities.update_attributes(entity_id,
-                                                          {ucapi.remote.Attributes.STATE:
-                                                              remote.LG_REMOTE_STATE_MAPPING.get(
-                                                                  attributes.get(MediaAttr.STATE, States.UNKNOWN))})
+                    attributes.get(MediaAttr.STATE, States.UNKNOWN)
+                )
+                api.configured_entities.update_attributes(
+                    entity_id,
+                    {
+                        ucapi.remote.Attributes.STATE: remote.LG_REMOTE_STATE_MAPPING.get(
+                            attributes.get(MediaAttr.STATE, States.UNKNOWN)
+                        )
+                    },
+                )
             continue
 
         device = config.devices.get(device_id)
@@ -241,12 +250,7 @@ async def on_avr_update(device_id: str, update: dict[str, Any] | None) -> None:
         if device_id not in _configured_devices:
             return
         device = _configured_devices[device_id]
-        update = {
-            MediaAttr.STATE: device.state,
-            MediaAttr.MEDIA_POSITION: device.media_position,
-            MediaAttr.MEDIA_DURATION: device.media_duration,
-            MediaAttr.MEDIA_TYPE: MediaType.VIDEO,
-        }
+        update = device.attributes
     else:
         _LOG.info("[%s] LG soundbar update: %s", device_id, update)
 
@@ -290,7 +294,10 @@ def _configure_new_device(device_config: config.DeviceInstance, connect: bool = 
     """
     # the device should not yet be configured, but better be safe
     if device_config.id in _configured_devices:
+        _LOG.debug("Existing config device updated, update the running device %s", device_config)
         device = _configured_devices[device_config.id]
+        asyncio.create_task(device.disconnect())
+        device.update_config(device_config)
     else:
         device = LGDevice(device_config)
 
@@ -327,6 +334,12 @@ def on_device_added(device: config.DeviceInstance) -> None:
     _configure_new_device(device, connect=False)
 
 
+def on_device_updated(device: config.DeviceInstance) -> None:
+    """Handle an updated device in the configuration."""
+    _LOG.debug("Device config updated: %s, reconnect with new configuration", device)
+    _configure_new_device(device, connect=True)
+
+
 def on_device_removed(device: config.DeviceInstance | None) -> None:
     """Handle a removed device in the configuration."""
     if device is None:
@@ -351,6 +364,7 @@ async def _async_remove(device: LGDevice) -> None:
     # await device.disconnect()
     device.events.remove_all_listeners()
 
+
 async def main():
     """Start the Remote Two integration driver."""
     logging.basicConfig()
@@ -365,7 +379,7 @@ async def main():
     logging.getLogger("receiver").setLevel(level)
     logging.getLogger("setup_flow").setLevel(level)
 
-    config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed)
+    config.devices = config.Devices(api.config_dir_path, on_device_added, on_device_removed, on_device_updated)
     for device in config.devices.all():
         _LOG.debug("UC device %s %s", device.id, device.address)
         _configure_new_device(device, connect=False)

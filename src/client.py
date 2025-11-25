@@ -8,7 +8,7 @@ This module implements the LG soundbar communication of the Remote Two integrati
 # coding: utf-8
 import asyncio
 import logging
-from asyncio import CancelledError, Lock, shield, Task
+from asyncio import CancelledError, Lock, Task, shield
 from datetime import timedelta
 from enum import IntEnum
 from functools import wraps
@@ -16,15 +16,16 @@ from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, 
 
 import ucapi.media_player
 from aiohttp import ClientError, ClientSession
-from config import DeviceInstance
 from pyee.asyncio import AsyncIOEventEmitter
 from ucapi.media_player import Attributes, Commands, MediaType, States
 
-from lglib import Temescal, equalisers, functions
+from config import DeviceInstance
+from lglib import LGNetworkOSError, Temescal, equalisers, functions
 
 _LOGGER = logging.getLogger(__name__)
 
 CONNECTION_RETRIES = 10
+ERROR_OS_WAIT = 0.5
 
 
 class Events(IntEnum):
@@ -54,6 +55,7 @@ def cmd_wrapper(
             await func(obj, *args, **kwargs)
             await obj.start_polling()
             return ucapi.StatusCodes.OK
+        # pylint: disable=W0718
         except Exception as exc:
             # If Kodi is off, we expect calls to fail.
             if obj.state == States.OFF:
@@ -89,6 +91,7 @@ def cmd_wrapper(
                             ex,
                         )
             return ucapi.StatusCodes.BAD_REQUEST
+
     return wrapper
 
 
@@ -97,6 +100,7 @@ class LGDevice:
 
     def __init__(self, device_config: DeviceInstance, timeout=3, refresh_frequency=60):
         """Initialize of a LG soundbar instance."""
+        # pylint: disable=R0915
         self._id = device_config.id
         self._name = device_config.name
         self._hostname = device_config.address
@@ -151,15 +155,15 @@ class LGDevice:
         self._info_event = asyncio.Event()
         self._source_event = asyncio.Event()
         self._playback_info_event = asyncio.Event()
-        self._receive_task: Task|None = None
+        self._receive_task: Task | None = None
 
     def handle_event(self, response):
         """Handle responses from the speakers."""
-        _LOGGER.debug("Received %s", response)
         # pylint: disable = R0914,R0915
+        _LOGGER.debug("Received %s", response)
         data = response.get("data") or {}
         update_data = {}
-        #_LOGGER.debug("Received event %s", response)
+        # _LOGGER.debug("Received event %s", response)
         if response["msg"] == "EQ_VIEW_INFO":
             if "i_bass" in data:
                 self._bass = data["i_bass"]
@@ -244,7 +248,7 @@ class LGDevice:
                 self._auto_display = data["b_auto_display"]
             self._info_event.set()
         elif response["msg"] == "PLAY_INFO":
-            current_playstate = self.play_state
+            # current_playstate = self.play_state
             current_title = self.media_title
             current_artist = self.media_artist
             current_position = self.media_position
@@ -294,11 +298,23 @@ class LGDevice:
             return
         try:
             await self._connect_lock.acquire()
-            await self._device.connect()
+            try:
+                await self._device.connect()
+            except LGNetworkOSError as ex:
+                _LOGGER.warning(
+                    "[%s] OS error, waiting %ss and retry connection (%s)",
+                    self._device_config.address,
+                    ERROR_OS_WAIT,
+                    ex,
+                )
+                await asyncio.sleep(ERROR_OS_WAIT)
+                await self._device.connect()
+
             if self.connected:
                 await self.update()
             await self.start_polling()
             self.events.emit(Events.CONNECTED, self.id)
+        # pylint: disable=W0718
         except Exception as ex:
             _LOGGER.error("Failed to connect %s", ex)
         self._connect_lock.release()
@@ -356,7 +372,7 @@ class LGDevice:
         #     await self.connect()
         await self._device.connect()
         if self._receive_task is None:
-            self._receive_task = asyncio.create_task(self.receiving_task())
+            self._receive_task = asyncio.create_task(self._receiving_task())
 
         _LOGGER.debug("Request updates")
         self._device.get_eq()
@@ -382,21 +398,16 @@ class LGDevice:
             self._device.get_product_info()
         self._update_lock.release()
 
-    # async def event_task(self, event: asyncio.Event, name: str):
-    #     await event.wait()
-    #     _LOGGER.debug("Event received %s", name)
-
-    async def receiving_task(self):
-        # tasks: [asyncio.Task] = []
-        for (event, name) in [(self._volume_event, "Volume event"),
-                      (self._source_event, "Source event"),
-                      (self._info_event, "Info event"),
-                      (self._equalizer_event, "Equalizer event"),
-                       (self._playback_info_event, "Playback info event")
-                      ]:
+    async def _receiving_task(self):
+        """Receiving task callback."""
+        for event, _ in [
+            (self._volume_event, "Volume event"),
+            (self._source_event, "Source event"),
+            (self._info_event, "Info event"),
+            (self._equalizer_event, "Equalizer event"),
+            (self._playback_info_event, "Playback info event"),
+        ]:
             await event.wait()
-            #tasks.append(asyncio.create_task(self.event_task(event, name)))
-        #await asyncio.wait(tasks)
 
     async def update_volume(self):
         """Trigger updates from the device."""
@@ -413,7 +424,7 @@ class LGDevice:
         return self._id
 
     @property
-    def attributes(self) -> dict[str, any]:
+    def attributes(self) -> dict[str, Any]:
         """Return the device attributes."""
         updated_data = {
             Attributes.STATE: self.state,
@@ -428,7 +439,7 @@ class LGDevice:
             Attributes.MEDIA_DURATION: self.media_duration,
             Attributes.MEDIA_POSITION: self.media_position,
             Attributes.MEDIA_TITLE: self.media_title,
-            Attributes.MEDIA_ARTIST: self.media_artist
+            Attributes.MEDIA_ARTIST: self.media_artist,
         }
         return updated_data
 
@@ -449,6 +460,7 @@ class LGDevice:
 
     @property
     def connected(self) -> bool:
+        """Connection state."""
         if self._device:
             return self._device.connected
         return False
@@ -460,12 +472,12 @@ class LGDevice:
 
     @property
     def play_state(self):
+        """Playback state."""
         if self._stream_type == 0:
             return States.UNKNOWN
         if self._play_control == 1:
             return States.PAUSED
         return States.PLAYING
-
 
     @property
     def state(self) -> States:
@@ -559,6 +571,10 @@ class LGDevice:
         """Device configuration."""
         return self._device_config
 
+    def update_config(self, device_config: DeviceInstance):
+        """Update existing configuration."""
+        self._device_config = device_config
+
     @cmd_wrapper
     async def toggle(self):
         """Toggle on or off."""
@@ -588,7 +604,7 @@ class LGDevice:
 
     @cmd_wrapper
     async def select_sound_mode(self, sound_mode: str) -> None:
-        """Set Sound Mode for Receiver.."""
+        """Set Sound Mode for Receiver."""
         self._device.set_eq(equalisers.index(sound_mode))
 
     @cmd_wrapper
@@ -628,7 +644,6 @@ class LGDevice:
         _LOGGER.debug("Sending mute: %s", muted)
         self._device.set_mute(muted)
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: muted})
-        # await self.update_volume()
 
     @cmd_wrapper
     async def mute_toggle(self):
@@ -637,9 +652,9 @@ class LGDevice:
         _LOGGER.debug("Sending mute: %s", mute)
         self._device.set_mute(mute)
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: mute})
-        # await self.update_volume()
 
     def check_source(self, source_id) -> bool:
+        """Add given source id in the list if not present."""
         if source_id not in self._functions:
             self._functions.append(source_id)
             return True
@@ -665,7 +680,6 @@ class LGDevice:
             self._device.get_func()
         except ValueError:
             _LOGGER.warning("Error select next source: %s", self._function)
-            pass
 
     @cmd_wrapper
     async def send_command(self, command):

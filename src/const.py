@@ -2,7 +2,7 @@
 """
 This module implements a Remote Two integration driver for Orange STB.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2025 by Albaintor
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
@@ -12,9 +12,10 @@ __version__ = "1.0.0"
 
 from ucapi.ui import Buttons, DeviceButtonMapping, UiPage
 
-
 SCAN_INTERVAL = timedelta(seconds=10)
 DEFAULT_NAME = "lgsoundbar"
+DEFAULT_PORT = 9741
+DEFAULT_VOLUME_STEP = 1
 
 LG_SIMPLE_COMMANDS = [
     "INPUT_NEXT",

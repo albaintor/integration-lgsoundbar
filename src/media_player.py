@@ -1,16 +1,13 @@
 """
 Media-player entity functions.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2025 by Albaintor
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
 
 import logging
 from typing import Any
 
-from client import LGDevice
-from config import DeviceInstance, create_entity_id
-from const import LG_SIMPLE_COMMANDS
 from ucapi import EntityTypes, MediaPlayer, StatusCodes
 from ucapi.media_player import (
     Attributes,
@@ -21,6 +18,10 @@ from ucapi.media_player import (
     Options,
     States,
 )
+
+from client import LGDevice
+from config import DeviceInstance, create_entity_id
+from const import LG_SIMPLE_COMMANDS
 
 _LOG = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class LGMediaPlayer(MediaPlayer):
             # Features.CHANNEL_SWITCHER,
             Features.MEDIA_POSITION,
             Features.MEDIA_DURATION,
-            Features.MEDIA_IMAGE_URL
+            Features.MEDIA_IMAGE_URL,
             # Features.INFO,
             # Features.AUDIO_TRACK,
             # Features.SUBTITLE,
@@ -197,4 +198,3 @@ class LGMediaPlayer(MediaPlayer):
             attributes[key] = value
 
         return attributes
-

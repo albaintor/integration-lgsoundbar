@@ -1,25 +1,46 @@
 """
 LG soundbar library handling of the integration driver.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2025 by Albaintor
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
+
 import asyncio
 import json
 import logging
 import struct
 from asyncio import BaseTransport, Transport
-from typing import Callable, Any
+from typing import Any, Callable
 
 from Crypto.Cipher import AES
 
 _LOG = logging.getLogger(__name__)
 
-equalisers = ["Standard", "Bass", "Flat", "Boost", "Treble and Bass", "User",
-              "Music", "Cinema", "Night", "News", "Voice", "ia_sound",
-              "Adaptive Sound Control", "Movie", "Bass Blast", "Dolby Atmos",
-              "DTS Virtual X", "Bass Boost Plus", "DTS X", "AI Sound Pro",
-              "Clear Voice", "Sports", "Game"]
+equalisers = [
+    "Standard",
+    "Bass",
+    "Flat",
+    "Boost",
+    "Treble and Bass",
+    "User",
+    "Music",
+    "Cinema",
+    "Night",
+    "News",
+    "Voice",
+    "ia_sound",
+    "Adaptive Sound Control",
+    "Movie",
+    "Bass Blast",
+    "Dolby Atmos",
+    "DTS Virtual X",
+    "Bass Boost Plus",
+    "DTS X",
+    "AI Sound Pro",
+    "Clear Voice",
+    "Sports",
+    "Game",
+]
 
 STANDARD = 0
 BASS = 1
@@ -45,10 +66,29 @@ CLEAR_VOICE = 20
 SPORTS = 21
 GAME = 22
 
-functions = ["Wi-Fi", "Bluetooth", "Portable", "Aux", "Optical", "CP", "HDMI",
-             "ARC", "Spotify", "Optical2", "HDMI2", "HDMI3", "LG TV", "Mic",
-             "Chromecast", "Optical/HDMI ARC", "LG Optical", "FM", "USB", "USB2",
-             "E-ARC"]
+functions = [
+    "Wi-Fi",
+    "Bluetooth",
+    "Portable",
+    "Aux",
+    "Optical",
+    "CP",
+    "HDMI",
+    "ARC",
+    "Spotify",
+    "Optical2",
+    "HDMI2",
+    "HDMI3",
+    "LG TV",
+    "Mic",
+    "Chromecast",
+    "Optical/HDMI ARC",
+    "LG Optical",
+    "FM",
+    "USB",
+    "USB2",
+    "E-ARC",
+]
 
 functions_map = {
     "Optical": "Optical/HDMI ARC",
@@ -88,10 +128,14 @@ PLAYING = 0
 PAUSED = 1
 
 
-class Temescal(asyncio.Protocol):
+class LGNetworkOSError(OSError):
+    """OSError error."""
+
+
+class Temescal(asyncio.Protocol):  # noqa: D102
     """LG library."""
 
-    def __init__(self, address, port=9741, callback:Callable[[Any], None]|None = None, logger=None):
+    def __init__(self, address, port=9741, callback: Callable[[Any], None] | None = None, logger=None):
         """Initialize a LG soundbar device."""
         self.iv = b"'%^Ur7gy$~t+f)%@"
         self.key = b"T^&*J%^7tr~4^%^&I(o%^!jIJ__+a0 k"
@@ -104,12 +148,14 @@ class Temescal(asyncio.Protocol):
         self._connected = False
 
     def connection_made(self, transport: BaseTransport):
+        """Callback call on connection made."""  # noqa: D401
         # peername = transport.get_extra_info('peername')
         # print('Connection from {}'.format(peername))
         self._transport = transport
         self._connected = True
 
     def data_received(self, data: bytes):
+        """Callback call on received data."""  # noqa: D401
         if len(data) == 0:
             self._transport.close()
             self._transport = None
@@ -126,23 +172,23 @@ class Temescal(asyncio.Protocol):
             response = self.decrypt_packet(data)
             if response is not None:
                 # Better to create a task ?
-                #self.callback(json.loads(response))
+                # self.callback(json.loads(response))
                 asyncio.create_task(self.handle_response(response))
 
     def connection_lost(self, exc):
+        """Callback call on connection lost."""  # noqa: D401
         _LOG.warning("Connection lost with the server, reconnect... (%s)", exc)
         if self._transport:
             self._transport.close()
             self._transport = None
-        self.connect()
+        asyncio.create_task(self.connect())
 
     async def handle_response(self, response):
+        """Send device response to registered callback."""
         self.callback(json.loads(response))
 
     async def _connection_task(self):
-        self._transport, protocol = await self._loop.create_connection(
-            lambda: self,
-            host=self.address, port=self.port)
+        self._transport, _ = await self._loop.create_connection(lambda: self, host=self.address, port=self.port)
 
     async def connect(self):
         """Connect to the device."""
@@ -151,12 +197,10 @@ class Temescal(asyncio.Protocol):
         try:
             await asyncio.wait_for(self._connection_task(), timeout=5)
             _LOG.debug("Server connected %s", self.connected)
-        except Exception as ex:
-            _LOG.error("Unable to connect %s", ex)
-
-        # self._transport, protocol = await self._loop.create_connection(
-        #     lambda: self,
-        #     host=self.address, port=self.port)
+        except OSError as ex:
+            if not isinstance(ex, ConnectionRefusedError):
+                raise LGNetworkOSError(ex) from ex
+            raise ex
 
     def disconnect(self):
         """Disconnect from the device."""
@@ -172,6 +216,7 @@ class Temescal(asyncio.Protocol):
 
     @property
     def connected(self) -> bool:
+        """Connection state."""
         return self._connected
 
     def encrypt_packet(self, data):
@@ -200,6 +245,7 @@ class Temescal(asyncio.Protocol):
         # pylint: disable=W0718
         if self._transport is None:
             _LOG.debug("Cannot send any packet, no connection active")
+            # pylint: disable=W0719
             raise Exception("Cannot send any packet, no connection active")
         packet = self.encrypt_packet(json.dumps(data))
         try:
@@ -207,11 +253,10 @@ class Temescal(asyncio.Protocol):
         except Exception as ex:
             _LOG.error("Error sending packet %s", ex)
             try:
-                self._loop.run_until_complete(self.connect)
+                self._loop.run_until_complete(self.connect())
                 self._transport.write(packet)
             except Exception:
                 _LOG.error("Error sending packet #2 %s", ex)
-                pass
 
     def power(self, value: bool):
         """Power command."""

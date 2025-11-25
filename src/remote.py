@@ -1,14 +1,18 @@
 """
 Media-player entity functions.
 
-:copyright: (c) 2023 by Unfolded Circle ApS.
+:copyright: (c) 2025 by Albaintor
 :license: Mozilla Public License Version 2.0, see LICENSE for more details.
 """
+
 import asyncio
 import logging
 from typing import Any
 
+from ucapi import EntityTypes, Remote, StatusCodes
 from ucapi.media_player import States
+from ucapi.remote import Attributes, Commands, Features, Options
+from ucapi.remote import States as RemoteStates
 
 from client import LGDevice
 from config import DeviceInstance, create_entity_id
@@ -17,9 +21,6 @@ from const import (
     LG_REMOTE_UI_PAGES,
     LG_SIMPLE_COMMANDS,
 )
-from ucapi import EntityTypes, Remote, StatusCodes
-from ucapi.remote import Attributes, Commands, Features, Options
-from ucapi.remote import States as RemoteStates
 
 _LOG = logging.getLogger(__name__)
 
