@@ -24,7 +24,7 @@ from ucapi.media_player import States
 
 import config
 from client import LGDevice
-from config import DeviceInstance
+from config import ConfigDevice
 from const import DEFAULT_PORT, DEFAULT_VOLUME_STEP
 
 _LOG = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class SetupSteps(IntEnum):
 _setup_step = SetupSteps.INIT
 _discovered_devices: list[LGDevice] = []
 _cfg_add_device: bool = False
-_reconfigured_device: DeviceInstance | None = None
+_reconfigured_device: ConfigDevice | None = None
 _user_input_discovery = RequestUserInput(
     {"en": "Setup mode", "de": "Setup Modus", "fr": "Configuration"},
     [
@@ -431,7 +431,7 @@ async def _handle_discovery(msg: UserDataResponse) -> RequestUserInput | SetupEr
         try:
             # simple connection check
             device = LGDevice(
-                device_config=DeviceInstance(
+                device_config=ConfigDevice(
                     id=address, address=address, port=int(port), volume_step=volume_step, name="LG", always_on=False
                 )
             )
@@ -535,7 +535,7 @@ async def handle_device_choice(msg: UserDataResponse) -> SetupComplete | SetupEr
         return SetupError(error_type=IntegrationSetupError.OTHER)
 
     config.devices.add_or_update(
-        DeviceInstance(
+        ConfigDevice(
             id=unique_id,
             name=device.device_name,
             address=device.hostname,

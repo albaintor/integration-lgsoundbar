@@ -10,7 +10,7 @@ import asyncio
 import logging
 from asyncio import CancelledError, Lock, Task, shield
 from datetime import timedelta
-from enum import IntEnum
+from enum import StrEnum
 from functools import wraps
 from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, TypeVar
 
@@ -18,8 +18,10 @@ import ucapi.media_player
 from aiohttp import ClientError, ClientSession
 from pyee.asyncio import AsyncIOEventEmitter
 from ucapi.media_player import Attributes, Commands, MediaType, States
+from ucapi.select import Attributes as SelectAttributes
 
-from config import DeviceInstance
+from config import ConfigDevice
+from const import LGSelects
 from lglib import LGNetworkOSError, Temescal, equalisers, functions
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,14 +30,14 @@ CONNECTION_RETRIES = 10
 ERROR_OS_WAIT = 0.5
 
 
-class Events(IntEnum):
+class Events(StrEnum):
     """Internal driver events."""
 
-    CONNECTED = 0
-    ERROR = 1
-    UPDATE = 2
-    IP_ADDRESS_CHANGED = 3
-    DISCONNECTED = 4
+    CONNECTED = "CONNECTED"
+    ERROR = "ERROR"
+    UPDATE = "UPDATE"
+    IP_ADDRESS_CHANGED = "IP_ADDRESS_CHANGED"
+    DISCONNECTED = "DISCONNECTED"
 
 
 _LGDeviceT = TypeVar("_LGDeviceT", bound="LGDevice")
@@ -98,7 +100,7 @@ def cmd_wrapper(
 class LGDevice:
     """LG client library."""
 
-    def __init__(self, device_config: DeviceInstance, timeout=3, refresh_frequency=60):
+    def __init__(self, device_config: ConfigDevice, timeout=3, refresh_frequency=60):
         """Initialize of a LG soundbar instance."""
         # pylint: disable=R0915
         self._id = device_config.id
@@ -172,9 +174,13 @@ class LGDevice:
             if "ai_eq_list" in data and len(self._equalisers) != len(data["ai_eq_list"]):
                 self._equalisers = data["ai_eq_list"]
                 update_data[Attributes.SOUND_MODE_LIST] = self.sound_mode_list
+                update_data[LGSelects.SELECT_SOUND_OUTPUT] = {SelectAttributes.OPTIONS: self.sound_mode_list}
             if "i_curr_eq" in data and self._equaliser != data["i_curr_eq"]:
                 self._equaliser = data["i_curr_eq"]
                 update_data[Attributes.SOUND_MODE] = self.sound_mode
+                if update_data[LGSelects.SELECT_SOUND_OUTPUT] is None:
+                    update_data[LGSelects.SELECT_SOUND_OUTPUT] = {}
+                update_data[LGSelects.SELECT_SOUND_OUTPUT][SelectAttributes.CURRENT_OPTION] = self.sound_mode
             self._equalizer_event.set()
         elif response["msg"] == "SPK_LIST_VIEW_INFO":
             current_volume = self.volume
@@ -192,8 +198,14 @@ class LGDevice:
                 self._mute = data["b_mute"]
             if "i_curr_func" in data:
                 self._function = data["i_curr_func"]
+                if self._function != data["i_curr_func"]:
+                    self._function = data["i_curr_func"]
+                    update_data[LGSelects.SELECT_INPUT_SOURCE] = {SelectAttributes.CURRENT_OPTION: self.source_list}
                 if self.check_source(self._function):
                     update_data[Attributes.SOURCE_LIST] = self.source_list
+                    if update_data[LGSelects.SELECT_INPUT_SOURCE] is None:
+                        update_data[LGSelects.SELECT_INPUT_SOURCE] = {}
+                    update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.OPTIONS] = self.source_list
             if current_state != self.state:
                 update_data[Attributes.STATE] = self.state
             if current_volume != self.volume:
@@ -213,8 +225,12 @@ class LGDevice:
                     self._functions = data["ai_func_list"]
             if current_source != self.source:
                 update_data[Attributes.SOURCE] = self.source
+                update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.CURRENT_OPTION] = self.source
             if len(current_functions) != len(self.source_list):
                 update_data[Attributes.SOURCE_LIST] = self.source_list
+                if update_data[LGSelects.SELECT_INPUT_SOURCE] is None:
+                    update_data[LGSelects.SELECT_INPUT_SOURCE] = {}
+                update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.OPTIONS] = self.source_list
             _LOGGER.debug("SOURCES %s", self.source_list)
             self._source_event.set()
         elif response["msg"] == "SETTING_VIEW_INFO":
@@ -440,6 +456,14 @@ class LGDevice:
             Attributes.MEDIA_POSITION: self.media_position,
             Attributes.MEDIA_TITLE: self.media_title,
             Attributes.MEDIA_ARTIST: self.media_artist,
+            LGSelects.SELECT_INPUT_SOURCE: {
+                SelectAttributes.OPTIONS: self.source_list,
+                SelectAttributes.CURRENT_OPTION: self.source,
+            },
+            LGSelects.SELECT_SOUND_OUTPUT: {
+                SelectAttributes.OPTIONS: self.sound_mode_list,
+                SelectAttributes.CURRENT_OPTION: self.sound_mode,
+            },
         }
         return updated_data
 
@@ -571,7 +595,7 @@ class LGDevice:
         """Device configuration."""
         return self._device_config
 
-    def update_config(self, device_config: DeviceInstance):
+    def update_config(self, device_config: ConfigDevice):
         """Update existing configuration."""
         self._device_config = device_config
 

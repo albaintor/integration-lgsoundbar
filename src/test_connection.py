@@ -8,7 +8,7 @@ from typing import Any
 from rich import print_json
 
 from client import Events, LGDevice
-from config import DeviceInstance
+from config import ConfigDevice
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -23,7 +23,7 @@ async def on_device_update(device_id: str, update: dict[str, Any] | None) -> Non
 async def main():
     _LOG.debug("Start connection")
     client = LGDevice(
-        device_config=DeviceInstance(
+        device_config=ConfigDevice(
             id="deviceid", name="LG Soundbar", address="192.168.1.53", port=9741, volume_step=1.0, always_on=False
         )
     )

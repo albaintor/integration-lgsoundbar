@@ -10,12 +10,22 @@ from datetime import timedelta
 
 __version__ = "1.0.0"
 
+from enum import Enum
+
 from ucapi.ui import Buttons, DeviceButtonMapping, UiPage
 
 SCAN_INTERVAL = timedelta(seconds=10)
 DEFAULT_NAME = "lgsoundbar"
 DEFAULT_PORT = 9741
 DEFAULT_VOLUME_STEP = 1
+
+
+class LGSelects(str, Enum):
+    """LG select values."""
+
+    SELECT_INPUT_SOURCE = "select_input_source"
+    SELECT_SOUND_OUTPUT = "select_sound_output"
+
 
 LG_SIMPLE_COMMANDS = [
     "INPUT_NEXT",

@@ -15,7 +15,7 @@ from ucapi.remote import Attributes, Commands, Features, Options
 from ucapi.remote import States as RemoteStates
 
 from client import LGDevice
-from config import DeviceInstance, create_entity_id
+from config import ConfigDevice, LGEntity, create_entity_id
 from const import (
     LG_REMOTE_BUTTONS_MAPPING,
     LG_REMOTE_UI_PAGES,
@@ -35,12 +35,13 @@ LG_REMOTE_STATE_MAPPING = {
 }
 
 
-class LGRemote(Remote):
+class LGRemote(Remote, LGEntity):
     """Representation of a Kodi Media Player entity."""
 
-    def __init__(self, config_device: DeviceInstance, device: LGDevice):
+    def __init__(self, config_device: ConfigDevice, device: LGDevice):
         """Initialize the class."""
         self._device = device
+        self._config_device = config_device
         _LOG.debug("LGSoundbar remote init")
         entity_id = create_entity_id(config_device.id, EntityTypes.REMOTE)
         features = [Features.SEND_CMD, Features.ON_OFF, Features.TOGGLE]
@@ -57,6 +58,11 @@ class LGRemote(Remote):
             simple_commands=LG_SIMPLE_COMMANDS,
         )
 
+    @property
+    def deviceid(self) -> str:
+        """Return the device identifier."""
+        return self._config_device.id
+
     def get_int_param(self, param: str, params: dict[str, Any], default: int):
         """Extract int parameter."""
         # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
@@ -67,7 +73,13 @@ class LGRemote(Remote):
             return int(float(value))
         return default
 
-    async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
+    async def command(
+        self,
+        cmd_id: str,
+        params: dict[str, Any] | None = None,
+        *,
+        websocket: Any,
+    ) -> StatusCodes:
         """
         Media-player entity command handler.
 
@@ -75,6 +87,8 @@ class LGRemote(Remote):
 
         :param cmd_id: command
         :param params: optional command parameters
+        :param websocket: optional websocket connection. Allows for directed event
+          callbacks instead of broadcasts.
         :return: status code of the command request
         """
         _LOG.info("Got %s command request: %s %s", self.id, cmd_id, params)

@@ -20,18 +20,19 @@ from ucapi.media_player import (
 )
 
 from client import LGDevice
-from config import DeviceInstance, create_entity_id
+from config import ConfigDevice, LGEntity, create_entity_id
 from const import LG_SIMPLE_COMMANDS
 
 _LOG = logging.getLogger(__name__)
 
 
-class LGMediaPlayer(MediaPlayer):
+class LGMediaPlayer(MediaPlayer, LGEntity):
     """Representation of a Sony Media Player entity."""
 
-    def __init__(self, config_device: DeviceInstance, device: LGDevice):
+    def __init__(self, config_device: ConfigDevice, device: LGDevice):
         """Initialize the class."""
         self._device = device
+        self._config_device = config_device
         _LOG.debug("LGSoundbar media player init")
         entity_id = create_entity_id(config_device.id, EntityTypes.MEDIA_PLAYER)
         # TODO add additional buttons if possible
@@ -89,7 +90,18 @@ class LGMediaPlayer(MediaPlayer):
             entity_id, config_device.name, features, attributes, device_class=DeviceClasses.SPEAKER, options=options
         )
 
-    async def command(self, cmd_id: str, params: dict[str, Any] | None = None) -> StatusCodes:
+    @property
+    def deviceid(self) -> str:
+        """Return the device identifier."""
+        return self._config_device.id
+
+    async def command(
+        self,
+        cmd_id: str,
+        params: dict[str, Any] | None = None,
+        *,
+        websocket: Any,
+    ) -> StatusCodes:
         """
         Media-player entity command handler.
 
@@ -97,6 +109,8 @@ class LGMediaPlayer(MediaPlayer):
 
         :param cmd_id: command
         :param params: optional command parameters
+        :param websocket: optional websocket connection. Allows for directed event
+                  callbacks instead of broadcasts.
         :return: status code of the command request
         """
         # pylint: disable=R0911
