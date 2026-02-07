@@ -20,6 +20,7 @@ import config
 import media_player
 import remote
 import selector
+import sensor
 import setup_flow
 from client import LGDevice
 from config import LGEntity
@@ -116,8 +117,8 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                 api.configured_entities.update_attributes(
                     entity_id, {ucapi.remote.Attributes.STATE: remote.LG_REMOTE_STATE_MAPPING.get(state)}
                 )
-            # elif isinstance(entity, sensor.LGSensor):
-            #     api.configured_entities.update_attributes(entity_id, entity.update_attributes())
+            elif isinstance(entity, sensor.LGSensor):
+                api.configured_entities.update_attributes(entity_id, entity.update_attributes())
             elif isinstance(entity, selector.LGSelect):
                 api.configured_entities.update_attributes(entity_id, entity.update_attributes())
 
@@ -266,8 +267,8 @@ async def on_avr_update(device_id: str, update: dict[str, Any] | None) -> None:
             attributes = filter_attributes(update, ucapi.media_player.Attributes)
         elif isinstance(configured_entity, remote.LGRemote):
             attributes = configured_entity.filter_changed_attributes(update)
-        # elif isinstance(configured_entity, sensor.LGSensor):
-        #     attributes = configured_entity.update_attributes(update)
+        elif isinstance(configured_entity, sensor.LGSensor):
+            attributes = configured_entity.update_attributes(update)
         elif isinstance(configured_entity, selector.LGSelect):
             attributes = configured_entity.update_attributes(update)
 
@@ -342,10 +343,10 @@ def _register_available_entities(config_device: config.ConfigDevice, device: LGD
         remote.LGRemote(config_device, device),
         selector.LGInputSourceSelect(config_device, device),
         selector.LGSoundOutputSelect(config_device, device),
-        # sensor.LGSensorInputSource(config_device, device),
-        # sensor.LGSensorVolume(config_device, device),
-        # sensor.LGSensorMuted(config_device, device),
-        # sensor.LGSensorSoundOutput(config_device, device),
+        sensor.LGSensorInputSource(config_device, device),
+        sensor.LGSensorVolume(config_device, device),
+        sensor.LGSensorMuted(config_device, device),
+        sensor.LGSensorSoundOutput(config_device, device),
     ]
     for entity in entities:
         if api.available_entities.contains(entity.id):

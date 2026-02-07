@@ -35,6 +35,17 @@ LG_REMOTE_STATE_MAPPING = {
 }
 
 
+def get_int_param(param: str, params: dict[str, Any], default: int):
+    """Extract int parameter."""
+    # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
+    if params is None or param is None:
+        return default
+    value = params.get(param, default)
+    if isinstance(value, str) and len(value) > 0:
+        return int(float(value))
+    return default
+
+
 class LGRemote(Remote, LGEntity):
     """Representation of a Kodi Media Player entity."""
 
@@ -63,16 +74,6 @@ class LGRemote(Remote, LGEntity):
         """Return the device identifier."""
         return self._config_device.id
 
-    def get_int_param(self, param: str, params: dict[str, Any], default: int):
-        """Extract int parameter."""
-        # TODO bug to be fixed on UC Core : some params are sent as (empty) strings by remote (hold == "")
-        if params is None or param is None:
-            return default
-        value = params.get(param, default)
-        if isinstance(value, str) and len(value) > 0:
-            return int(float(value))
-        return default
-
     async def command(
         self,
         cmd_id: str,
@@ -97,7 +98,7 @@ class LGRemote(Remote, LGEntity):
             _LOG.warning("No LG instance for entity: %s", self.id)
             return StatusCodes.SERVICE_UNAVAILABLE
 
-        repeat = self.get_int_param("repeat", params, 1)
+        repeat = get_int_param("repeat", params, 1)
         res = StatusCodes.OK
         for _i in range(0, repeat):
             res = await self.handle_command(cmd_id, params)
@@ -107,7 +108,7 @@ class LGRemote(Remote, LGEntity):
         """Handle command."""
         # pylint: disable=R0911
         # hold = self.get_int_param("hold", params, 0)
-        delay = self.get_int_param("delay", params, 0)
+        delay = get_int_param("delay", params, 0)
         command = ""
         if params:
             command = params.get("command", "")

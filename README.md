@@ -4,6 +4,8 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
 
 The driver lets add your LG Soundbars on the network to your Remote Two. A media player and a remote entity are exposed to the core.
 
+**Media Player**
+
 Supported attributes:
 
 - State (on, off, playing, paused, unknown)
@@ -26,16 +28,63 @@ Supported commands for media player :
 - Source field selection (from the list)
 - Simple commands including toggles settings of : night mode, auto volume control, neural X, dynamic range compression
 
+**Remote entity**
+
 Supported commands for remote entity :
 - Send command
 - Send command sequence
 - Predefined buttons mapping
 - Predefined UI mapping
 
+**Selectors (dropdowns) entities**
 
-## Todo
+- Input source selection
+- Sound mode selection
+
+**Sensors entities**
+
+- Current input source
+- Current sound mode
+- Volume level
+- Volume muted
+
+
+### Todo
 - Add missing commands : I had to sniff the network requests between the mobile app and the soundbar to grab missing commands. However the mobile app is limited and does not reproduce the physical buttons of the remote. So I have no idea how to make play/pause, next/previous, and simulate the direction pad. Maybe this is not possible
 - Optimize the requests : actually the requests are not in sync with responses. This is not a problem but it could be optimized to have real sync.
+
+### Setup
+
+- Download the release from the release section : file ending with `.tar.gz`, do not unzip it
+- Navigate into the Web Configurator of the remote, go into the `Integrations` tab, click on `Add new` and select : `Install custom`
+- Select the downloaded `.tar.gz` file and click on upload
+- Once uploaded, the new integration should appear in the list : click on it and select `Start setup`
+- Your device must be running and connected to the network before proceeding
+- The setup will be able to discover the devices if they are connected on the same network, otherwise it is necessary to set manual IP
+- At the end, most users should enable the `Media Player` entity. `Remote entity` is useful for custom commands and commands sequence.
+- Sensors and selectors are also available
+
+### Upgrade and backup/restore
+
+The remote doesn't allow to upgrade an existing integration yet : it is necessary to remove the existing integration (twice) before being able to install a new release.<br>
+However the integration lets backup or restore the devices configuration (in JSON format), so that you don't have to perform the setup and pairing process again.
+
+If you want to upgrade the integration to a new release, or simply wants to backup the configuration for later restore or cloning the configuration to another remote, you can use backup/restore.
+
+To use this functionality, launch the setup flow of your existing integration, and select the `Backup or restore` option in the setup flow :
+<img width="350" alt="image" src="https://github.com/user-attachments/assets/28799000-d6c9-4f99-86b1-286a857d12bb" />
+
+Then you will have a text field with the current configuration. This field which will be empty if no devices are configured. 
+Then just save the content of the text field in a file for later restore and abort the setup flow (clicking next will apply this configuration)
+
+You can now remove the integration and upload the new one. Once you launch the setup flow, you will have an option to perform the normal setup flow or restore a configuration.
+Select this option and just replace the content of the text field by the previously saved configuration and click on next to apply it. 
+<br>
+Beware while using this functionality : the expected format should be respected and could change in the future.
+If the format is not recognized, the import will be aborted and existing configuration will remain unchanged.
+
+This functionnality can also be used to clone a configuration from one remote to another.
+
 
 
 ### Setup

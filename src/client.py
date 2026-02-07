@@ -21,7 +21,7 @@ from ucapi.media_player import Attributes, Commands, MediaType, States
 from ucapi.select import Attributes as SelectAttributes
 
 from config import ConfigDevice
-from const import LGSelects
+from const import LGSelects, LGSensors
 from lglib import LGNetworkOSError, Temescal, equalisers, functions
 
 _LOGGER = logging.getLogger(__name__)
@@ -181,6 +181,7 @@ class LGDevice:
                 if update_data[LGSelects.SELECT_SOUND_OUTPUT] is None:
                     update_data[LGSelects.SELECT_SOUND_OUTPUT] = {}
                 update_data[LGSelects.SELECT_SOUND_OUTPUT][SelectAttributes.CURRENT_OPTION] = self.sound_mode
+                update_data[LGSensors.SENSOR_SOUND_OUTPUT] = self.sound_mode
             self._equalizer_event.set()
         elif response["msg"] == "SPK_LIST_VIEW_INFO":
             current_volume = self.volume
@@ -200,7 +201,8 @@ class LGDevice:
                 self._function = data["i_curr_func"]
                 if self._function != data["i_curr_func"]:
                     self._function = data["i_curr_func"]
-                    update_data[LGSelects.SELECT_INPUT_SOURCE] = {SelectAttributes.CURRENT_OPTION: self.source_list}
+                    update_data[LGSelects.SELECT_INPUT_SOURCE] = {SelectAttributes.CURRENT_OPTION: self.source}
+                    update_data[LGSensors.SENSOR_INPUT_SOURCE] = self.source
                 if self.check_source(self._function):
                     update_data[Attributes.SOURCE_LIST] = self.source_list
                     if update_data[LGSelects.SELECT_INPUT_SOURCE] is None:
@@ -210,8 +212,10 @@ class LGDevice:
                 update_data[Attributes.STATE] = self.state
             if current_volume != self.volume:
                 update_data[Attributes.VOLUME] = self.volume
+                update_data[LGSensors.SENSOR_VOLUME] = self.volume
             if current_mute != self.muted:
                 update_data[Attributes.MUTED] = self.muted
+                update_data[LGSensors.SENSOR_MUTED] = self.muted
             self._volume_event.set()
         elif response["msg"] == "FUNC_VIEW_INFO":
             current_source = self.source
@@ -226,6 +230,7 @@ class LGDevice:
             if current_source != self.source:
                 update_data[Attributes.SOURCE] = self.source
                 update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.CURRENT_OPTION] = self.source
+                update_data[LGSensors.SENSOR_INPUT_SOURCE] = self.source
             if len(current_functions) != len(self.source_list):
                 update_data[Attributes.SOURCE_LIST] = self.source_list
                 if update_data[LGSelects.SELECT_INPUT_SOURCE] is None:
@@ -464,6 +469,10 @@ class LGDevice:
                 SelectAttributes.OPTIONS: self.sound_mode_list,
                 SelectAttributes.CURRENT_OPTION: self.sound_mode,
             },
+            LGSensors.SENSOR_MUTED: self.muted,
+            LGSensors.SENSOR_VOLUME: self.volume,
+            LGSensors.SENSOR_INPUT_SOURCE: self.source,
+            LGSensors.SENSOR_SOUND_OUTPUT: self.sound_mode,
         }
         return updated_data
 

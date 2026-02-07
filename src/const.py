@@ -20,6 +20,15 @@ DEFAULT_PORT = 9741
 DEFAULT_VOLUME_STEP = 1
 
 
+class LGSensors(str, Enum):
+    """LG sensor values."""
+
+    SENSOR_INPUT_SOURCE = "sensor_input_source"
+    SENSOR_VOLUME = "sensor_volume"
+    SENSOR_MUTED = "sensor_muted"
+    SENSOR_SOUND_OUTPUT = "sensor_sound_output"
+
+
 class LGSelects(str, Enum):
     """LG select values."""
 

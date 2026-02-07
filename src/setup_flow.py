@@ -42,6 +42,7 @@ class SetupSteps(IntEnum):
     BACKUP_RESTORE = 6
 
 
+# pylint: disable=C0103
 _setup_step = SetupSteps.INIT
 _discovered_devices: list[LGDevice] = []
 _cfg_add_device: bool = False
