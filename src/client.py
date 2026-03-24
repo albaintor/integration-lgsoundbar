@@ -167,18 +167,18 @@ class LGDevice:
         update_data = {}
         # _LOGGER.debug("Received event %s", response)
         if response["msg"] == "EQ_VIEW_INFO":
-            if "i_bass" in data:
-                self._bass = data["i_bass"]
-            if "i_treble" in data:
-                self._treble = data["i_treble"]
-            if "ai_eq_list" in data and len(self._equalisers) != len(data["ai_eq_list"]):
-                self._equalisers = data["ai_eq_list"]
+            if value := data.get("i_bass"):
+                self._bass = value
+            if value := data.get("i_treble"):
+                self._treble = value
+            if (value := data.get("ai_eq_list")) and len(self._equalisers) != len(value):
+                self._equalisers = value
                 update_data[Attributes.SOUND_MODE_LIST] = self.sound_mode_list
                 update_data[LGSelects.SELECT_SOUND_OUTPUT] = {SelectAttributes.OPTIONS: self.sound_mode_list}
-            if "i_curr_eq" in data and self._equaliser != data["i_curr_eq"]:
-                self._equaliser = data["i_curr_eq"]
+            if (value := data.get("i_curr_eq")) and self._equaliser != value:
+                self._equaliser = value
                 update_data[Attributes.SOUND_MODE] = self.sound_mode
-                if update_data[LGSelects.SELECT_SOUND_OUTPUT] is None:
+                if update_data.get(LGSelects.SELECT_SOUND_OUTPUT) is None:
                     update_data[LGSelects.SELECT_SOUND_OUTPUT] = {}
                 update_data[LGSelects.SELECT_SOUND_OUTPUT][SelectAttributes.CURRENT_OPTION] = self.sound_mode
                 update_data[LGSensors.SENSOR_SOUND_OUTPUT] = self.sound_mode
@@ -187,25 +187,25 @@ class LGDevice:
             current_volume = self.volume
             current_mute = self.muted
             current_state = self.state
-            if "b_powerstatus" in data:
-                self._power_state = data["b_powerstatus"]
-            if "i_vol" in data:
-                self._volume = int(data["i_vol"])
-            if "i_vol_min" in data:
-                self._volume_min = int(data["i_vol_min"])
-            if "i_vol_max" in data:
-                self._volume_max = int(data["i_vol_max"])
-            if "b_mute" in data:
-                self._mute = data["b_mute"]
-            if "i_curr_func" in data:
-                self._function = data["i_curr_func"]
-                if self._function != data["i_curr_func"]:
-                    self._function = data["i_curr_func"]
+            if value := data.get("b_powerstatus"):
+                self._power_state = value
+            if value := data.get("i_vol"):
+                self._volume = int(value)
+            if value := data.get("i_vol_min"):
+                self._volume_min = int(value)
+            if value := data.get("i_vol_max"):
+                self._volume_max = int(value)
+            if value := data.get("b_mute"):
+                self._mute = value
+            if function := data.get("i_curr_func"):
+                if self._function != function:
+                    self._function = function
                     update_data[LGSelects.SELECT_INPUT_SOURCE] = {SelectAttributes.CURRENT_OPTION: self.source}
                     update_data[LGSensors.SENSOR_INPUT_SOURCE] = self.source
+                    update_data[Attributes.SOURCE] = self.source
                 if self.check_source(self._function):
                     update_data[Attributes.SOURCE_LIST] = self.source_list
-                    if update_data[LGSelects.SELECT_INPUT_SOURCE] is None:
+                    if update_data.get(LGSelects.SELECT_INPUT_SOURCE) is None:
                         update_data[LGSelects.SELECT_INPUT_SOURCE] = {}
                     update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.OPTIONS] = self.source_list
             if current_state != self.state:
@@ -219,54 +219,54 @@ class LGDevice:
             self._volume_event.set()
         elif response["msg"] == "FUNC_VIEW_INFO":
             current_source = self.source
-            current_functions = self.source_list
-            if "i_curr_func" in data:
-                self._function = data["i_curr_func"]
+            current_functions = self.source_list.copy()
+            if current_function := data.get("i_curr_func"):
+                self._function = current_function
                 if self.check_source(self._function):
                     update_data[Attributes.SOURCE_LIST] = self.source_list
-            if "ai_func_list" in data:
-                if len(data["ai_func_list"]) > len(self._functions):
-                    self._functions = data["ai_func_list"]
+            if functions_list := data.get("ai_func_list"):
+                if len(functions_list) > len(self._functions):
+                    self._functions = functions_list
             if current_source != self.source:
                 update_data[Attributes.SOURCE] = self.source
                 update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.CURRENT_OPTION] = self.source
                 update_data[LGSensors.SENSOR_INPUT_SOURCE] = self.source
             if len(current_functions) != len(self.source_list):
                 update_data[Attributes.SOURCE_LIST] = self.source_list
-                if update_data[LGSelects.SELECT_INPUT_SOURCE] is None:
+                if update_data.get(LGSelects.SELECT_INPUT_SOURCE) is None:
                     update_data[LGSelects.SELECT_INPUT_SOURCE] = {}
                 update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.OPTIONS] = self.source_list
             _LOGGER.debug("SOURCES %s", self.source_list)
             self._source_event.set()
         elif response["msg"] == "SETTING_VIEW_INFO":
-            if "i_rear_min" in data:
-                self._rear_volume_min = data["i_rear_min"]
-            if "i_rear_max" in data:
-                self._rear_volume_max = data["i_rear_max"]
-            if "i_rear_level" in data:
-                self._rear_volume = data["i_rear_level"]
-            if "i_woofer_min" in data:
-                self._woofer_volume_min = data["i_woofer_min"]
-            if "i_woofer_max" in data:
-                self._woofer_volume_max = data["i_woofer_max"]
-            if "i_woofer_level" in data:
-                self._woofer_volume = data["i_woofer_level"]
-            if "i_curr_eq" in data:
-                self._equaliser = data["i_curr_eq"]
-            if "s_user_name" in data:
-                self._device_name = data["s_user_name"]
-            if "b_night_mode" in data:
-                self._night_mode = data["b_night_mode"]
-            if "b_auto_vol" in data:
-                self._auto_volume_control = data["b_auto_vol"]
-            if "b_drc" in data:
-                self._dynamic_range_reduction = data["b_drc"]
-            if "b_neuralx" in data:
-                self._neural_x = data["b_neuralx"]
-            if "b_tv_remote" in data:
-                self._tv_remote = data["b_tv_remote"]
-            if "b_auto_display" in data:
-                self._auto_display = data["b_auto_display"]
+            if value := data.get("i_rear_min"):
+                self._rear_volume_min = value
+            if value := data.get("i_rear_max"):
+                self._rear_volume_max = value
+            if value := data.get("i_rear_level"):
+                self._rear_volume = value
+            if value := data.get("i_woofer_min"):
+                self._woofer_volume_min = value
+            if value := data.get("i_woofer_max"):
+                self._woofer_volume_max = value
+            if value := data.get("i_woofer_level"):
+                self._woofer_volume = value
+            if value := data.get("i_curr_eq"):
+                self._equaliser = value
+            if value := data.get("s_user_name"):
+                self._device_name = value
+            if value := data.get("b_night_mode"):
+                self._night_mode = value
+            if value := data.get("b_auto_vol"):
+                self._auto_volume_control = value
+            if value := data.get("b_drc"):
+                self._dynamic_range_reduction = value
+            if value := data.get("b_neuralx"):
+                self._neural_x = value
+            if value := data.get("b_tv_remote"):
+                self._tv_remote = value
+            if value := data.get("b_auto_display"):
+                self._auto_display = value
             self._info_event.set()
         elif response["msg"] == "PLAY_INFO":
             # current_playstate = self.play_state
@@ -275,24 +275,24 @@ class LGDevice:
             current_position = self.media_position
             current_duration = self.media_duration
             current_artwork = self.media_image_url
-            if "s_title" in data:
-                self._media_title = data["s_title"]
-            if "s_artist" in data:
-                self._media_artist = data["s_artist"]
-            if "i_position" in data:
-                self._media_position = data["i_position"]
+            if value := data.get("s_title"):
+                self._media_title = value
+            if value := data.get("s_artist"):
+                self._media_artist = value
+            if value := data.get("i_position"):
+                self._media_position = value
                 if self._media_position == -1:
                     self._media_position = 0
-            if "i_duration" in data:
-                self._media_duration = data["i_duration"]
+            if value := data.get("i_duration"):
+                self._media_duration = value
                 if self._media_duration == -1:
                     self._media_duration = 0
-            if "s_albumart" in data:
-                self._media_artwork = data["s_albumart"]
-            if "i_stream_type" in data:
-                self._stream_type = data.get("i_stream_type", 0)
-            if "i_play_ctrl" in data:
-                self._play_control = data.get("i_play_ctrl", 0)
+            if value := data.get("s_albumart"):
+                self._media_artwork = value
+            if value := data.get("i_stream_type"):
+                self._stream_type = value
+            if value := data.get("i_play_ctrl"):
+                self._play_control = value
 
             if current_title != self.media_title:
                 update_data[Attributes.MEDIA_TITLE] = self.media_title
@@ -306,8 +306,8 @@ class LGDevice:
                 update_data[Attributes.MEDIA_IMAGE_URL] = self.media_image_url
             self._playback_info_event.set()
         elif response["msg"] == "PRODUCT_INFO":
-            if "s_uuid" in data:
-                self._serial_number = data["s_uuid"]
+            if value := data.get("s_uuid"):
+                self._serial_number = value
 
         if update_data:
             self.events.emit(Events.UPDATE, self.id, update_data)
