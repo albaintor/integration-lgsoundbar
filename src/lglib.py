@@ -240,7 +240,7 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         decrypt = decrypt[: -ord(padding)]
         return str(decrypt, "utf-8")
 
-    def send_packet(self, data):
+    def send_packet(self, data) -> bool:
         """Send a packet."""
         # pylint: disable=W0718
         if self._transport is None:
@@ -250,13 +250,16 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         packet = self.encrypt_packet(json.dumps(data))
         try:
             self._transport.write(packet)
+            return True
         except Exception as ex:
             _LOG.error("Error sending packet %s", ex)
             try:
                 self._loop.run_until_complete(self.connect())
                 self._transport.write(packet)
+                return True
             except Exception:
                 _LOG.error("Error sending packet #2 %s", ex)
+        return False
 
     def power(self, value: bool):
         """Power command."""
@@ -433,10 +436,10 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         data = {"cmd": "set", "data": {"i_curr_func": value}, "msg": "FUNC_VIEW_INFO"}
         self.send_packet(data)
 
-    def set_volume(self, value):
+    def set_volume(self, value) -> bool:
         """Set volume."""
         data = {"cmd": "set", "data": {"i_vol": value}, "msg": "SPK_LIST_VIEW_INFO"}
-        self.send_packet(data)
+        return self.send_packet(data)
 
     def set_mute(self, enable):
         """Set mute."""

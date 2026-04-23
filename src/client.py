@@ -17,7 +17,7 @@ from typing import Any, Awaitable, Callable, Concatenate, Coroutine, ParamSpec, 
 import ucapi.media_player
 from aiohttp import ClientError, ClientSession
 from pyee.asyncio import AsyncIOEventEmitter
-from ucapi.media_player import Attributes, Commands, MediaType, States
+from ucapi.media_player import Attributes, Commands, MediaContentType, States
 from ucapi.select import Attributes as SelectAttributes
 
 from config import ConfigDevice
@@ -451,7 +451,7 @@ class LGDevice:
             Attributes.STATE: self.state,
             Attributes.SOURCE_LIST: self.source_list,
             Attributes.SOURCE: self.source if self.source else "",
-            Attributes.MEDIA_TYPE: MediaType.VIDEO,
+            Attributes.MEDIA_TYPE: MediaContentType.VIDEO,
             Attributes.SOUND_MODE_LIST: self.sound_mode_list,
             Attributes.SOUND_MODE: self.sound_mode if self.sound_mode else "",
             Attributes.MUTED: self.muted,
@@ -656,7 +656,8 @@ class LGDevice:
         """Send volume-up command to AVR."""
         volume = self._volume + self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = min(volume, self._volume_max)
-        self._device.set_volume(int(volume))
+        if not self._device.set_volume(int(volume)):
+            raise ClientError
         self._volume = int(volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
@@ -666,7 +667,8 @@ class LGDevice:
         """Send volume-down command to AVR."""
         volume = self._volume - self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = max(volume, self._volume_min)
-        self._device.set_volume(int(volume))
+        if not self._device.set_volume(int(volume)):
+            raise ClientError
         self._volume = int(volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()

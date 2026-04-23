@@ -14,7 +14,7 @@ from ucapi.media_player import (
     Commands,
     DeviceClasses,
     Features,
-    MediaType,
+    MediaContentType,
     Options,
     States,
 )
@@ -77,7 +77,7 @@ class LGMediaPlayer(MediaPlayer, LGEntity):
             Attributes.SOURCE_LIST: device.source_list if device.source_list else [],
             Attributes.SOUND_MODE: device.sound_mode,
             Attributes.SOUND_MODE_LIST: device.sound_mode_list,
-            Attributes.MEDIA_TYPE: MediaType.VIDEO,  # TODO to improve based on PLAY_INFO.i_stream_type
+            Attributes.MEDIA_TYPE: MediaContentType.VIDEO,  # TODO to improve based on PLAY_INFO.i_stream_type
             Attributes.MEDIA_IMAGE_URL: device.media_image_url,
             Attributes.MEDIA_POSITION: device.media_position,
             Attributes.MEDIA_DURATION: device.media_duration,
