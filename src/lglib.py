@@ -159,7 +159,7 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         if len(data) == 0:
             self._transport.close()
             self._transport = None
-            self.connect()
+            asyncio.create_task(self.connect())
             return
 
         if data[0] == 0x10:
@@ -178,6 +178,7 @@ class Temescal(asyncio.Protocol):  # noqa: D102
     def connection_lost(self, exc):
         """Callback call on connection lost."""  # noqa: D401
         _LOG.warning("Connection lost with the server, reconnect... (%s)", exc)
+        self._connected = False
         if self._transport:
             self._transport.close()
             self._transport = None
@@ -212,7 +213,7 @@ class Temescal(asyncio.Protocol):  # noqa: D102
     def reconnect(self):
         """Reconnect."""
         self.disconnect()
-        self.connect()
+        asyncio.create_task(self.connect())
 
     @property
     def connected(self) -> bool:
@@ -240,7 +241,24 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         decrypt = decrypt[: -ord(padding)]
         return str(decrypt, "utf-8")
 
-    def send_packet(self, data) -> bool:
+    def send_packet_handled(self, data) -> bool:
+        """Send a packet."""
+        try:
+            self.send_packet(data)
+            return True
+        except Exception:  # pylint: disable=W0718
+            return False
+
+    async def _connect_and_send(self, packet: bytearray):
+        try:
+            await self.connect()
+            if self._transport is None:
+                raise ConnectionError("No active transport after reconnect")
+            self._transport.write(packet)
+        except Exception as ex:  # pylint: disable=W0718
+            _LOG.error("Error resending packet %s", ex)
+
+    def send_packet(self, data):
         """Send a packet."""
         # pylint: disable=W0718
         if self._transport is None:
@@ -253,103 +271,98 @@ class Temescal(asyncio.Protocol):  # noqa: D102
             return True
         except Exception as ex:
             _LOG.error("Error sending packet %s", ex)
-            try:
-                self._loop.run_until_complete(self.connect())
-                self._transport.write(packet)
-                return True
-            except Exception:
-                _LOG.error("Error sending packet #2 %s", ex)
-        return False
+            asyncio.create_task(self._connect_and_send(packet))
+            return True
 
-    def power(self, value: bool):
+    def power(self, off: bool):
         """Power command."""
-        data = {"cmd": "set", "data": {"b_powerkey": value}, "msg": "SPK_LIST_VIEW_INFO"}
-        self.send_packet(data)
+        data = {"cmd": "set", "data": {"b_powerkey": off}, "msg": "SPK_LIST_VIEW_INFO"}
+        self.send_packet_handled(data)
 
     def get_eq(self):
         """Get equalizer settings."""
         data = {"cmd": "get", "msg": "EQ_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def set_eq(self, eq) -> bool:
         """Set equalizer settings."""
         data = {"cmd": "set", "data": {"i_curr_eq": eq}, "msg": "EQ_VIEW_INFO"}
-        return self.send_packet(data)
+        return self.send_packet_handled(data)
 
     def get_info(self):
         """Get information."""
         data = {"cmd": "get", "msg": "SPK_LIST_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_play(self):
         """Get play state."""
         data = {"cmd": "get", "msg": "PLAY_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_func(self):
         """Get functions information."""
         data = {"cmd": "get", "msg": "FUNC_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_settings(self):
         """Get settings information."""
         data = {"cmd": "get", "msg": "SETTING_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_product_info(self):
         """Get product information."""
         data = {"cmd": "get", "msg": "PRODUCT_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_c4a_info(self):
         """Get C4A_SETTING_INFO."""
         data = {"cmd": "get", "msg": "C4A_SETTING_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_radio_info(self):
         """Get radio information."""
         data = {"cmd": "get", "msg": "RADIO_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_ap_info(self):
         """Get app information."""
         data = {"cmd": "get", "msg": "SHARE_AP_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_update_info(self):
         """Get update information."""
         data = {"cmd": "get", "msg": "UPDATE_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_build_info(self):
         """Get build information."""
         data = {"cmd": "get", "msg": "BUILD_INFO_DEV"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_option_info(self):
         """Get options information."""
         data = {"cmd": "get", "msg": "OPTION_INFO_DEV"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_mac_info(self):
         """Get mac information."""
         data = {"cmd": "get", "msg": "MAC_INFO_DEV"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_mem_mon_info(self):
         """Get memory monitoring information."""
         data = {"cmd": "get", "msg": "MEM_MON_DEV"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def get_test_info(self):
         """Get test information."""
         data = {"cmd": "get", "msg": "TEST_DEV"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def test_tone(self):
         """Get test tone."""
         data = {"cmd": "set", "msg": "TEST_TONE_REQ"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def set_night_mode(self, enable):
         """Set night mode."""
@@ -431,25 +444,25 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         data = {"cmd": "set", "data": {"i_sleep_time": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
-    def set_func(self, value) -> bool:
+    def set_func(self, value):
         """Set source."""
         data = {"cmd": "set", "data": {"i_curr_func": value}, "msg": "FUNC_VIEW_INFO"}
-        return self.send_packet(data)
+        self.send_packet(data)
 
-    def set_volume(self, value) -> bool:
+    def set_volume(self, value):
         """Set volume."""
         data = {"cmd": "set", "data": {"i_vol": value}, "msg": "SPK_LIST_VIEW_INFO"}
-        return self.send_packet(data)
+        self.send_packet(data)
 
-    def set_mute(self, enable) -> bool:
+    def set_mute(self, enable):
         """Set mute."""
         data = {"cmd": "set", "data": {"b_mute": enable}, "msg": "SPK_LIST_VIEW_INFO"}
-        return self.send_packet(data)
+        self.send_packet(data)
 
     def set_name(self, name):
         """Set device name."""
         data = {"cmd": "set", "data": {"s_user_name": name}, "msg": "SETTING_VIEW_INFO"}
-        self.send_packet(data)
+        self.send_packet_handled(data)
 
     def send_command(self, msg, data):
         """Send a command."""
@@ -457,9 +470,9 @@ class Temescal(asyncio.Protocol):  # noqa: D102
             payload = {"cmd": "set", "data": data, "msg": msg}
         else:
             payload = {"cmd": "set", "msg": msg}
-        self.send_packet(payload)
+        self.send_packet_handled(payload)
 
     def set_factory(self):
         """Set to factory."""
         data = {"cmd": "set", "msg": "FACTORY_SET_REQ"}
-        self.send_packet(data)
+        self.send_packet_handled(data)

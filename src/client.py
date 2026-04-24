@@ -44,7 +44,7 @@ _LGDeviceT = TypeVar("_LGDeviceT", bound="LGDevice")
 _P = ParamSpec("_P")
 
 
-def cmd_wrapper(
+def retry(
     func: Callable[Concatenate[_LGDeviceT, _P], Awaitable[ucapi.StatusCodes | list]],
 ) -> Callable[Concatenate[_LGDeviceT, _P], Coroutine[Any, Any, ucapi.StatusCodes | list]]:
     """Catch command exceptions."""
@@ -167,16 +167,16 @@ class LGDevice:
         update_data = {}
         # _LOGGER.debug("Received event %s", response)
         if response["msg"] == "EQ_VIEW_INFO":
-            if value := data.get("i_bass"):
-                self._bass = value
-            if value := data.get("i_treble"):
-                self._treble = value
+            if "i_bass" in data:
+                self._bass = data["i_bass"]
+            if "i_treble" in data:
+                self._treble = data["i_treble"]
             if (value := data.get("ai_eq_list")) and len(self._equalisers) != len(value):
                 self._equalisers = value
                 update_data[Attributes.SOUND_MODE_LIST] = self.sound_mode_list
                 update_data[LGSelects.SELECT_SOUND_OUTPUT] = {SelectAttributes.OPTIONS: self.sound_mode_list}
-            if (value := data.get("i_curr_eq")) and self._equaliser != value:
-                self._equaliser = value
+            if "i_curr_eq" in data and self._equaliser != data["i_curr_eq"]:
+                self._equaliser = data["i_curr_eq"]
                 update_data[Attributes.SOUND_MODE] = self.sound_mode
                 if update_data.get(LGSelects.SELECT_SOUND_OUTPUT) is None:
                     update_data[LGSelects.SELECT_SOUND_OUTPUT] = {}
@@ -187,17 +187,18 @@ class LGDevice:
             current_volume = self.volume
             current_mute = self.muted
             current_state = self.state
-            if value := data.get("b_powerstatus"):
-                self._power_state = value
-            if value := data.get("i_vol"):
-                self._volume = int(value)
+            if "b_powerstatus" in data:
+                self._power_state = data["b_powerstatus"]
+            if "i_vol" in data:
+                self._volume = int(data["i_vol"])
             if value := data.get("i_vol_min"):
                 self._volume_min = int(value)
             if value := data.get("i_vol_max"):
                 self._volume_max = int(value)
-            if value := data.get("b_mute"):
-                self._mute = value
-            if function := data.get("i_curr_func"):
+            if "b_mute" in data:
+                self._mute = data["b_mute"]
+            if "i_curr_func" in data:
+                function = data["i_curr_func"]
                 if self._function != function:
                     self._function = function
                     update_data[LGSelects.SELECT_INPUT_SOURCE] = {SelectAttributes.CURRENT_OPTION: self.source}
@@ -205,8 +206,7 @@ class LGDevice:
                     update_data[Attributes.SOURCE] = self.source
                 if self.check_source(self._function):
                     update_data[Attributes.SOURCE_LIST] = self.source_list
-                    if update_data.get(LGSelects.SELECT_INPUT_SOURCE) is None:
-                        update_data[LGSelects.SELECT_INPUT_SOURCE] = {}
+                    update_data.setdefault(LGSelects.SELECT_INPUT_SOURCE, {})
                     update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.OPTIONS] = self.source_list
             if current_state != self.state:
                 update_data[Attributes.STATE] = self.state
@@ -233,40 +233,39 @@ class LGDevice:
                 update_data[LGSensors.SENSOR_INPUT_SOURCE] = self.source
             if len(current_functions) != len(self.source_list):
                 update_data[Attributes.SOURCE_LIST] = self.source_list
-                if update_data.get(LGSelects.SELECT_INPUT_SOURCE) is None:
-                    update_data[LGSelects.SELECT_INPUT_SOURCE] = {}
+                update_data.setdefault(LGSelects.SELECT_INPUT_SOURCE, {})
                 update_data[LGSelects.SELECT_INPUT_SOURCE][SelectAttributes.OPTIONS] = self.source_list
             _LOGGER.debug("SOURCES %s", self.source_list)
             self._source_event.set()
         elif response["msg"] == "SETTING_VIEW_INFO":
-            if value := data.get("i_rear_min"):
-                self._rear_volume_min = value
-            if value := data.get("i_rear_max"):
-                self._rear_volume_max = value
-            if value := data.get("i_rear_level"):
-                self._rear_volume = value
-            if value := data.get("i_woofer_min"):
-                self._woofer_volume_min = value
-            if value := data.get("i_woofer_max"):
-                self._woofer_volume_max = value
-            if value := data.get("i_woofer_level"):
-                self._woofer_volume = value
-            if value := data.get("i_curr_eq"):
-                self._equaliser = value
-            if value := data.get("s_user_name"):
-                self._device_name = value
-            if value := data.get("b_night_mode"):
-                self._night_mode = value
-            if value := data.get("b_auto_vol"):
-                self._auto_volume_control = value
-            if value := data.get("b_drc"):
-                self._dynamic_range_reduction = value
-            if value := data.get("b_neuralx"):
-                self._neural_x = value
-            if value := data.get("b_tv_remote"):
-                self._tv_remote = value
-            if value := data.get("b_auto_display"):
-                self._auto_display = value
+            if "i_rear_min" in data:
+                self._rear_volume_min = data["i_rear_min"]
+            if "i_rear_max" in data:
+                self._rear_volume_max = data["i_rear_max"]
+            if "i_rear_level" in data:
+                self._rear_volume = data["i_rear_level"]
+            if "i_woofer_min" in data:
+                self._woofer_volume_min = data["i_woofer_min"]
+            if "i_woofer_max" in data:
+                self._woofer_volume_max = data["i_woofer_max"]
+            if "i_woofer_level" in data:
+                self._woofer_volume = data["i_woofer_level"]
+            if "i_curr_eq" in data:
+                self._equaliser = data["i_curr_eq"]
+            if "s_user_name" in data:
+                self._device_name = data["s_user_name"]
+            if "b_night_mode" in data:
+                self._night_mode = data["b_night_mode"]
+            if "b_auto_vol" in data:
+                self._auto_volume_control = data["b_auto_vol"]
+            if "b_drc" in data:
+                self._dynamic_range_reduction = data["b_drc"]
+            if "b_neuralx" in data:
+                self._neural_x = data["b_neuralx"]
+            if "b_tv_remote" in data:
+                self._tv_remote = data["b_tv_remote"]
+            if "b_auto_display" in data:
+                self._auto_display = data["b_auto_display"]
             self._info_event.set()
         elif response["msg"] == "PLAY_INFO":
             # current_playstate = self.play_state
@@ -318,27 +317,26 @@ class LGDevice:
             _LOGGER.debug("Connection already in progress")
             return
         try:
-            await self._connect_lock.acquire()
-            try:
-                await self._device.connect()
-            except LGNetworkOSError as ex:
-                _LOGGER.warning(
-                    "[%s] OS error, waiting %ss and retry connection (%s)",
-                    self._device_config.address,
-                    ERROR_OS_WAIT,
-                    ex,
-                )
-                await asyncio.sleep(ERROR_OS_WAIT)
-                await self._device.connect()
+            async with self._connect_lock:
+                try:
+                    await self._device.connect()
+                except LGNetworkOSError as ex:
+                    _LOGGER.warning(
+                        "[%s] OS error, waiting %ss and retry connection (%s)",
+                        self._device_config.address,
+                        ERROR_OS_WAIT,
+                        ex,
+                    )
+                    await asyncio.sleep(ERROR_OS_WAIT)
+                    await self._device.connect()
 
-            if self.connected:
-                await self.update()
-            await self.start_polling()
-            self.events.emit(Events.CONNECTED, self.id)
+                if self.connected:
+                    await self.update()
+                await self.start_polling()
+                self.events.emit(Events.CONNECTED, self.id)
         # pylint: disable=W0718
         except Exception as ex:
             _LOGGER.error("Failed to connect %s", ex)
-        self._connect_lock.release()
 
     async def start_polling(self):
         """Start polling task."""
@@ -388,36 +386,41 @@ class LGDevice:
         if self._update_lock.locked():
             return
 
-        await self._update_lock.acquire()
-        # if self._session is None:
-        #     await self.connect()
-        await self._device.connect()
-        if self._receive_task is None:
-            self._receive_task = asyncio.create_task(self._receiving_task())
+        async with self._update_lock:
+            self._volume_event.clear()
+            self._source_event.clear()
+            self._info_event.clear()
+            self._equalizer_event.clear()
+            self._playback_info_event.clear()
 
-        _LOGGER.debug("Request updates")
-        self._device.get_eq()
-        await asyncio.sleep(0.2)
-        self._device.get_info()
-        await asyncio.sleep(0.2)
-        self._device.get_func()
-        await asyncio.sleep(0.2)
-        self._device.get_settings()
-        await asyncio.sleep(0.2)
-        self._device.get_play()
-        _LOGGER.debug("Request updates end")
-        try:
-            await asyncio.wait_for(shield(self._receive_task), timeout=5)
-        except asyncio.TimeoutError:
-            _LOGGER.debug("Request updates timeout")
-        try:
-            self._receive_task.cancel()
-        except CancelledError:
-            pass
-        self._receive_task = None
-        if full:
-            self._device.get_product_info()
-        self._update_lock.release()
+            # if self._session is None:
+            #     await self.connect()
+            await self._device.connect()
+            if self._receive_task is None:
+                self._receive_task = asyncio.create_task(self._receiving_task())
+
+            _LOGGER.debug("Request updates")
+            self._device.get_eq()
+            await asyncio.sleep(0.2)
+            self._device.get_info()
+            await asyncio.sleep(0.2)
+            self._device.get_func()
+            await asyncio.sleep(0.2)
+            self._device.get_settings()
+            await asyncio.sleep(0.2)
+            self._device.get_play()
+            _LOGGER.debug("Request updates end")
+            try:
+                await asyncio.wait_for(shield(self._receive_task), timeout=5)
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Request updates timeout")
+            try:
+                self._receive_task.cancel()
+            except CancelledError:
+                pass
+            self._receive_task = None
+            if full:
+                self._device.get_product_info()
 
     async def _receiving_task(self):
         """Receiving task callback."""
@@ -608,7 +611,7 @@ class LGDevice:
         """Update existing configuration."""
         self._device_config = device_config
 
-    @cmd_wrapper
+    @retry
     async def toggle(self):
         """Toggle on or off."""
         await self.connect()
@@ -617,80 +620,74 @@ class LGDevice:
         else:
             self._device.power(False)
 
-    @cmd_wrapper
+    @retry
     async def turn_on(self):
         """Turn on."""
         self._device.power(True)
 
-    @cmd_wrapper
+    @retry
     async def turn_off(self):
         """Turn off."""
         self._device.power(False)
 
-    @cmd_wrapper
+    @retry
     async def select_source(self, source: str) -> ucapi.StatusCodes:
         """Set volume level, range 0..100."""
         if source is None:
             return ucapi.StatusCodes.BAD_REQUEST
         _LOGGER.debug("Select source %s", source)
-        if not self._device.set_func(functions.index(source)):
-            raise ClientError
-        return ucapi.StatusCodes.OK
+        self._device.set_func(functions.index(source))
 
-    @cmd_wrapper
+    @retry
     async def select_sound_mode(self, sound_mode: str) -> None:
         """Set Sound Mode for Receiver."""
         if not self._device.set_eq(equalisers.index(sound_mode)):
             raise ClientError
 
-    @cmd_wrapper
+    @retry
     async def set_volume_level(self, volume: float | None):
         """Set volume level, range 0..100."""
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         target_volume = volume * (self._volume_max - self._volume_min) / 100 + self._volume_min
-        if not self._device.set_volume(int(volume)):
-            raise ClientError
+        self._device.set_volume(int(target_volume))
         self._volume = int(target_volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
 
-    @cmd_wrapper
+    @retry
     async def volume_up(self):
         """Send volume-up command to AVR."""
         volume = self._volume + self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = min(volume, self._volume_max)
-        if not self._device.set_volume(int(volume)):
-            raise ClientError
+        self._device.set_volume(int(volume))
         self._volume = int(volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
 
-    @cmd_wrapper
+    @retry
     async def volume_down(self):
         """Send volume-down command to AVR."""
         volume = self._volume - self._volume_step * (self._volume_max - self._volume_min) / 100
         volume = max(volume, self._volume_min)
-        if not self._device.set_volume(int(volume)):
-            raise ClientError
+        self._device.set_volume(int(volume))
         self._volume = int(volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
 
-    @cmd_wrapper
+    @retry
     async def mute(self, muted: bool):
         """Send mute command to AVR."""
         _LOGGER.debug("Sending mute: %s", muted)
         self._device.set_mute(muted)
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: muted})
 
-    @cmd_wrapper
+    @retry
     async def mute_toggle(self):
         """Send mute command to AVR."""
         mute = not self.muted
         _LOGGER.debug("Sending mute: %s", mute)
-        if not self._device.set_mute(mute):
-            raise ClientError
+        self._device.set_mute(mute)
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: mute})
 
     def check_source(self, source_id) -> bool:
@@ -700,7 +697,7 @@ class LGDevice:
             return True
         return False
 
-    @cmd_wrapper
+    @retry
     async def source_next(self):
         """Send next input source command to AVR."""
         if self._function == -1 or self._function >= len(functions):
@@ -721,7 +718,7 @@ class LGDevice:
         except ValueError:
             _LOGGER.warning("Error select next source: %s", self._function)
 
-    @cmd_wrapper
+    @retry
     async def send_command(self, command):
         """Send a command to the device."""
         if command == "MODE_NIGHT":
