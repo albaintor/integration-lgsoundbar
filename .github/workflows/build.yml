@@ -19,11 +19,10 @@ env:
 
 jobs:
   build:
-    # using ubuntu-24.04: Package 'qemu' has no installation candidate
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # History of 200 should be more than enough to calculate commit count since last release tag.
           fetch-depth: 200
@@ -45,7 +44,7 @@ jobs:
 
       - name: Prepare
         run: |
-          sudo apt-get update && sudo apt-get install -y qemu binfmt-support qemu-user-static
+          sudo apt-get install -y qemu-system-arm binfmt-support qemu-user-static
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
           echo "Starting pyinstaller build"
           docker run --rm --name builder \
@@ -80,7 +79,7 @@ jobs:
           tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/artifacts .
           ls -lah
           
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         id: upload_artifact
         with:
           name: ${{ env.ARTIFACT_NAME }}
@@ -91,13 +90,12 @@ jobs:
   release:
     name: Create Release
     if: github.ref == 'refs/heads/main' || contains(github.ref, 'tags/v')
-    # using ubuntu-24.04: Package 'qemu' has no installation candidate
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [build]
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Extract build archives from downloaded files
         run: |
