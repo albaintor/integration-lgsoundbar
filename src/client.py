@@ -628,17 +628,20 @@ class LGDevice:
         self._device.power(False)
 
     @cmd_wrapper
-    async def select_source(self, source: str):
+    async def select_source(self, source: str) -> ucapi.StatusCodes:
         """Set volume level, range 0..100."""
         if source is None:
             return ucapi.StatusCodes.BAD_REQUEST
         _LOGGER.debug("Select source %s", source)
-        self._device.set_func(functions.index(source))
+        if not self._device.set_func(functions.index(source)):
+            raise ClientError
+        return ucapi.StatusCodes.OK
 
     @cmd_wrapper
     async def select_sound_mode(self, sound_mode: str) -> None:
         """Set Sound Mode for Receiver."""
-        self._device.set_eq(equalisers.index(sound_mode))
+        if not self._device.set_eq(equalisers.index(sound_mode)):
+            raise ClientError
 
     @cmd_wrapper
     async def set_volume_level(self, volume: float | None):
@@ -646,7 +649,8 @@ class LGDevice:
         if volume is None:
             return ucapi.StatusCodes.BAD_REQUEST
         target_volume = volume * (self._volume_max - self._volume_min) / 100 + self._volume_min
-        self._device.set_volume(int(target_volume))
+        if not self._device.set_volume(int(volume)):
+            raise ClientError
         self._volume = int(target_volume)
         self.events.emit(Events.UPDATE, self.id, {Attributes.VOLUME: self.volume})
         # await self.update_volume()
@@ -685,7 +689,8 @@ class LGDevice:
         """Send mute command to AVR."""
         mute = not self.muted
         _LOGGER.debug("Sending mute: %s", mute)
-        self._device.set_mute(mute)
+        if not self._device.set_mute(mute):
+            raise ClientError
         self.events.emit(Events.UPDATE, self.id, {Attributes.MUTED: mute})
 
     def check_source(self, source_id) -> bool:

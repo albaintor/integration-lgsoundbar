@@ -271,10 +271,10 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         data = {"cmd": "get", "msg": "EQ_VIEW_INFO"}
         self.send_packet(data)
 
-    def set_eq(self, eq):
+    def set_eq(self, eq) -> bool:
         """Set equalizer settings."""
         data = {"cmd": "set", "data": {"i_curr_eq": eq}, "msg": "EQ_VIEW_INFO"}
-        self.send_packet(data)
+        return self.send_packet(data)
 
     def get_info(self):
         """Get information."""
@@ -431,20 +431,20 @@ class Temescal(asyncio.Protocol):  # noqa: D102
         data = {"cmd": "set", "data": {"i_sleep_time": value}, "msg": "SETTING_VIEW_INFO"}
         self.send_packet(data)
 
-    def set_func(self, value):
+    def set_func(self, value) -> bool:
         """Set source."""
         data = {"cmd": "set", "data": {"i_curr_func": value}, "msg": "FUNC_VIEW_INFO"}
-        self.send_packet(data)
+        return self.send_packet(data)
 
     def set_volume(self, value) -> bool:
         """Set volume."""
         data = {"cmd": "set", "data": {"i_vol": value}, "msg": "SPK_LIST_VIEW_INFO"}
         return self.send_packet(data)
 
-    def set_mute(self, enable):
+    def set_mute(self, enable) -> bool:
         """Set mute."""
         data = {"cmd": "set", "data": {"b_mute": enable}, "msg": "SPK_LIST_VIEW_INFO"}
-        self.send_packet(data)
+        return self.send_packet(data)
 
     def set_name(self, name):
         """Set device name."""
