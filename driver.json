@@ -1,8 +1,10 @@
 {
 	"driver_id": "lgsoundbar_driver",
-	"version": "1.5.0",
+	"version": "1.6.0",
 	"min_core_api": "0.20.0",
-	"name": { "en": "LG Soundbars" },
+	"name": {
+		"en": "LG Soundbars"
+	},
 	"icon": "custom:lg.png",
 	"description": {
 		"en": "Control your LG Soundbars with Remote Two/3.",
@@ -10,11 +12,11 @@
 		"fr": "Contrôler vos barres de son LG avec Remote Two/3."
 	},
 	"developer": {
-    "name": "Albaintor",
-    "email": "albaintor@github.com",
-    "url": "https://github.com/albaintor"
-  },
-  "home_page": "https://github.com/albaintor/integration-lgsoundbar",
+		"name": "Albaintor",
+		"email": "albaintor@github.com",
+		"url": "https://github.com/albaintor"
+	},
+	"home_page": "https://github.com/albaintor/integration-lgsoundbar",
 	"setup_data_schema": {
 		"title": {
 			"en": "Integration setup",
@@ -33,7 +35,7 @@
 					"label": {
 						"value": {
 							"en": "The integration will discover your LG Soundbars on your network. Please make sure that your LG Soundbars is powered on and that no old pairing request is shown.\nIf pairing continuously fails, restart your LG Soundbars and try again.",
-                            "fr": "L'intégration découvrira votre barre de son LG sur votre réseau.\nSi l'appairage échoue systématiquement, redémarrez votre barre de son LG et réessayez"
+							"fr": "L'intégration découvrira votre barre de son LG sur votre réseau.\nSi l'appairage échoue systématiquement, redémarrez votre barre de son LG et réessayez"
 						}
 					}
 				}
